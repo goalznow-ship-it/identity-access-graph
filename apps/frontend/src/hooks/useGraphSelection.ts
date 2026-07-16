@@ -22,6 +22,8 @@ function computeDependencies(
   const queueDown = [nodeId]
   const visitedUp = new Set<string>()
   const visitedDown = new Set<string>()
+  const sourceId = (link: GraphLink) => typeof link.source === 'object' ? (link.source as GraphNode).id : link.source
+  const targetId = (link: GraphLink) => typeof link.target === 'object' ? (link.target as GraphNode).id : link.target
 
   if (all) {
     while (queueUp.length > 0) {
@@ -29,9 +31,10 @@ function computeDependencies(
       if (visitedUp.has(current)) continue
       visitedUp.add(current)
       for (const link of links) {
-        if (link.target === current && link.source !== current && !visitedUp.has(link.source as string)) {
-          upstream.add(link.source as string)
-          queueUp.push(link.source as string)
+        const source = sourceId(link); const target = targetId(link)
+        if (target === current && source !== current && !visitedUp.has(source)) {
+          upstream.add(source)
+          queueUp.push(source)
         }
       }
     }
@@ -40,19 +43,21 @@ function computeDependencies(
       if (visitedDown.has(current)) continue
       visitedDown.add(current)
       for (const link of links) {
-        if (link.source === current && link.target !== current && !visitedDown.has(link.target as string)) {
-          downstream.add(link.target as string)
-          queueDown.push(link.target as string)
+        const source = sourceId(link); const target = targetId(link)
+        if (source === current && target !== current && !visitedDown.has(target)) {
+          downstream.add(target)
+          queueDown.push(target)
         }
       }
     }
   } else {
     for (const link of links) {
-      if (link.target === nodeId && link.source !== nodeId) {
-        upstream.add(link.source as string)
+      const source = sourceId(link); const target = targetId(link)
+      if (target === nodeId && source !== nodeId) {
+        upstream.add(source)
       }
-      if (link.source === nodeId && link.target !== nodeId) {
-        downstream.add(link.target as string)
+      if (source === nodeId && target !== nodeId) {
+        downstream.add(target)
       }
     }
   }
@@ -81,7 +86,7 @@ export function useGraphSelection(
 
   const selectNode = useCallback((node: GraphNode | null) => {
     setSelectedNode(node)
-    if (!node) setHighlightMode('none')
+    setHighlightMode(node ? 'direct' : 'none')
   }, [])
 
   const clearSelection = useCallback(() => {

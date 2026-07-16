@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useGraphData } from '../hooks/useGraphData'
 import { useGraphSelection } from '../hooks/useGraphSelection'
 import { useGraphFilters } from '../hooks/useGraphFilters'
+import { useGraphExpansion, type ExpansionDirection } from '../hooks/useGraphExpansion'
 import {
   GraphCanvas,
   GraphToolbar,
@@ -15,10 +17,15 @@ import {
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
 import { useSearchParams } from 'react-router-dom'
+import type { GraphCanvasHandle, GraphContextAction } from '../components/graph/GraphCanvas'
+import type { GraphNode } from '../types/graph'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
-  const { data, loading, error } = useGraphData(searchParams.get('importId'))
+  const navigate = useNavigate()
+  const importedId = searchParams.get('importId')
+  const [source, setSource] = useState<'mock' | 'imported'>(importedId ? 'imported' : 'mock')
+  const { data, loading, error } = useGraphData(source === 'imported' ? importedId : null)
   const links = data?.links ?? []
   const {
     selectedNode,
@@ -41,38 +48,27 @@ export function GraphPage() {
     allSourceSystems,
     allRiskLevels,
   } = useGraphFilters(data)
+  const { visibleData, expand, collapse, hide } = useGraphExpansion(filteredData)
 
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const graphContainerRef = useRef<HTMLDivElement>(null)
-  const fgRef = useRef<any>(null)
+  const fgRef = useRef<GraphCanvasHandle>(null)
 
   const handleZoomIn = useCallback(() => {
-    if (fgRef.current) {
-      const { innerWidth: w, innerHeight: h } = window
-      const center = { x: w / 2, y: h / 2 }
-      fgRef.current.zoomToPosition(fgRef.current.zoom() * 1.3, center.x, center.y, 300)
-    }
+    fgRef.current?.zoomIn()
   }, [])
 
   const handleZoomOut = useCallback(() => {
-    if (fgRef.current) {
-      const { innerWidth: w, innerHeight: h } = window
-      const center = { x: w / 2, y: h / 2 }
-      fgRef.current.zoomToPosition(fgRef.current.zoom() / 1.3, center.x, center.y, 300)
-    }
+    fgRef.current?.zoomOut()
   }, [])
 
   const handleFitToScreen = useCallback(() => {
-    if (fgRef.current) {
-      fgRef.current.zoomToFit(400)
-    }
+    fgRef.current?.fit()
   }, [])
 
   const handleResetView = useCallback(() => {
-    if (fgRef.current) {
-      fgRef.current.zoomToFit(400, 50)
-    }
+    fgRef.current?.reset()
   }, [])
 
   const handleToggleFullscreen = useCallback(() => {
@@ -82,10 +78,7 @@ export function GraphPage() {
   const handleSearchSelect = useCallback(
     (node: any) => {
       selectNode(node)
-      if (fgRef.current) {
-        fgRef.current.centerAt(node.x, node.y, 500)
-        fgRef.current.zoom(2, 500)
-      }
+      fgRef.current?.center(node)
     },
     [selectNode],
   )
@@ -100,6 +93,24 @@ export function GraphPage() {
   const handleBackgroundClick = useCallback(() => {
     clearSelection()
   }, [clearSelection])
+
+  const handleSourceChange = (next: 'mock' | 'imported') => {
+    if (next === 'imported' && !importedId) return
+    setSource(next); clearSelection()
+  }
+
+  const pinNode = (node: GraphNode) => { node.fx = node.x ?? 0; node.fy = node.y ?? 0 }
+  const showDependencies = (node: GraphNode) => { selectNode(node); setHighlightMode('all') }
+  const handleContextAction = (action: GraphContextAction, node: GraphNode, direction: ExpansionDirection = 'both', depth = 1) => {
+    if (action === 'details') selectNode(node)
+    if (action === 'profile') navigate(`/identities/${node.id}`)
+    if (action === 'center') fgRef.current?.center(node)
+    if (action === 'expand') expand(node.id, direction, depth)
+    if (action === 'collapse') collapse(node.id)
+    if (action === 'hide') { hide(node.id); if (selectedNode?.id === node.id) clearSelection() }
+    if (action === 'pin') pinNode(node)
+    if (action === 'dependencies') showDependencies(node)
+  }
 
   if (loading) {
     return (
@@ -180,17 +191,22 @@ export function GraphPage() {
             highlightMode={highlightMode}
             onHighlightModeChange={setHighlightMode}
             hasSelection={selectedNode !== null}
+            source={source}
+            importedAvailable={Boolean(importedId)}
+            onSourceChange={handleSourceChange}
           />
         </div>
 
         <div ref={graphContainerRef} className="flex-1 overflow-hidden">
           <GraphCanvas
-            data={filteredData}
+            ref={fgRef}
+            data={visibleData}
             selectedNode={selectedNode}
             highlightMode={highlightMode}
             dependencyInfo={dependencyInfo}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
+            onContextAction={handleContextAction}
           />
         </div>
       </div>
@@ -199,6 +215,9 @@ export function GraphPage() {
         node={selectedNode}
         data={data}
         onClose={clearSelection}
+        onCenter={(node) => fgRef.current?.center(node)}
+        onPin={pinNode}
+        onDependencies={showDependencies}
       />
     </motion.div>
   )

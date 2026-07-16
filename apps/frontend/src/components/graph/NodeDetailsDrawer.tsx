@@ -8,6 +8,9 @@ interface NodeDetailsDrawerProps {
   node: GraphNode | null
   data: GraphData | null
   onClose: () => void
+  onCenter?: (node: GraphNode) => void
+  onPin?: (node: GraphNode) => void
+  onDependencies?: (node: GraphNode) => void
 }
 
 const riskBadge: Record<string, 'primary' | 'success' | 'warning' | 'danger'> = {
@@ -25,12 +28,13 @@ function RelationshipsList({ title, links, nodes }: { title: string; links: Grap
       <p className="mb-1 text-xs font-medium text-gray-400">{title} ({links.length})</p>
       <div className="space-y-1">
         {links.map((l) => {
-          const target = nodes.get(l.target as string)
+          const targetId = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target
+          const target = nodes.get(targetId)
           return (
             <div key={l.id} className="rounded-md bg-card px-2 py-1.5 text-xs text-gray-300">
               <span className="text-gray-500">{l.relationshipType}</span>
               {' → '}
-              <span>{target?.displayName ?? (l.target as string)}</span>
+              <span>{target?.displayName ?? targetId}</span>
             </div>
           )
         })}
@@ -39,14 +43,14 @@ function RelationshipsList({ title, links, nodes }: { title: string; links: Grap
   )
 }
 
-export function NodeDetailsDrawer({ node, data, onClose }: NodeDetailsDrawerProps) {
+export function NodeDetailsDrawer({ node, data, onClose, onCenter, onPin, onDependencies }: NodeDetailsDrawerProps) {
   const navigate = useNavigate()
   if (!node) return null
 
   const nodeMap = new Map(data?.nodes.map((n) => [n.id, n]) ?? [])
 
-  const incomingLinks = data?.links.filter((l) => (l.target as string) === node.id) ?? []
-  const outgoingLinks = data?.links.filter((l) => (l.source as string) === node.id) ?? []
+  const incomingLinks = data?.links.filter((l) => (typeof l.target === 'object' ? (l.target as GraphNode).id : l.target) === node.id) ?? []
+  const outgoingLinks = data?.links.filter((l) => (typeof l.source === 'object' ? (l.source as GraphNode).id : l.source) === node.id) ?? []
 
   const isUser = node.nodeType === 'USER' || node.nodeType === 'LINUX_USER'
   const isHost = node.nodeType === 'HOST' || node.nodeType === 'COMPUTER'
@@ -95,6 +99,12 @@ export function NodeDetailsDrawer({ node, data, onClose }: NodeDetailsDrawerProp
               <div className="flex gap-2">
                 <Badge variant="primary">{node.nodeType}</Badge>
                 <Badge variant={riskBadge[node.riskLevel] ?? 'primary'}>{node.riskLevel}</Badge>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button className="rounded bg-card px-2 py-1 text-xs text-gray-300" onClick={() => onCenter?.(node)}>Center</button>
+                <button className="rounded bg-card px-2 py-1 text-xs text-gray-300" onClick={() => onPin?.(node)}>Pin</button>
+                <button className="rounded bg-card px-2 py-1 text-xs text-gray-300" onClick={() => onDependencies?.(node)}>Show dependencies</button>
               </div>
 
               <div className="space-y-1.5 text-xs">

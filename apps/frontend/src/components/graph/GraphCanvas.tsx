@@ -1,7 +1,10 @@
-import { useRef, useCallback, useEffect, useMemo } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import type { GraphNode, GraphLink, GraphData, HighlightMode, DependencyInfo } from '../../types/graph'
+import type { DependencyInfo, GraphData, GraphLink, GraphNode, HighlightMode } from '../../types/graph'
 import { getNodeColor } from '../../services/graphDataAdapter'
+
+export interface GraphCanvasHandle { zoomIn: () => void; zoomOut: () => void; fit: () => void; reset: () => void; center: (node: GraphNode) => void }
+export type GraphContextAction = 'details' | 'profile' | 'center' | 'expand' | 'collapse' | 'hide' | 'pin' | 'dependencies'
 
 interface GraphCanvasProps {
   data: GraphData
@@ -10,139 +13,66 @@ interface GraphCanvasProps {
   dependencyInfo: DependencyInfo | null
   onNodeClick: (node: GraphNode | null) => void
   onBackgroundClick: () => void
+  onContextAction?: (action: GraphContextAction, node: GraphNode, direction?: 'both' | 'incoming' | 'outgoing', depth?: number) => void
 }
 
-export function GraphCanvas({
-  data,
-  selectedNode,
-  highlightMode,
-  dependencyInfo,
-  onNodeClick,
-  onBackgroundClick,
-}: GraphCanvasProps) {
+const LABELED = new Set(['MEMBER_OF', 'HAS_ROLE', 'HAS_ACCESS_TO', 'REPORTS_TO', 'BELONGS_TO', 'RUNS_ON', 'SUPPORTS', 'USES'])
+
+export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas({ data, selectedNode, highlightMode, dependencyInfo, onNodeClick, onBackgroundClick, onContextAction }, ref) {
   const fgRef = useRef<any>(null)
+  const [menu, setMenu] = useState<{ node: GraphNode; x: number; y: number } | null>(null)
+  const [direction, setDirection] = useState<'both' | 'incoming' | 'outgoing'>('both')
+  const [depth, setDepth] = useState(1)
+  const upstream = useMemo(() => new Set(dependencyInfo ? [...dependencyInfo.upstream, ...dependencyInfo.allUpstream] : []), [dependencyInfo])
+  const downstream = useMemo(() => new Set(dependencyInfo ? [...dependencyInfo.downstream, ...dependencyInfo.allDownstream] : []), [dependencyInfo])
+  const hasSelection = Boolean(selectedNode && highlightMode !== 'none')
 
-  const selectedIds = useMemo(() => {
-    if (!selectedNode) return new Set<string>()
-    const ids = new Set<string>([selectedNode.id])
-    if (dependencyInfo) {
-      for (const id of dependencyInfo.upstream) ids.add(id)
-      for (const id of dependencyInfo.downstream) ids.add(id)
-      if (highlightMode === 'all') {
-        for (const id of dependencyInfo.allUpstream) ids.add(id)
-        for (const id of dependencyInfo.allDownstream) ids.add(id)
-      }
-    }
-    return ids
-  }, [selectedNode, dependencyInfo, highlightMode])
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 250),
+    zoomOut: () => fgRef.current?.zoom(fgRef.current.zoom() / 1.3, 250),
+    fit: () => fgRef.current?.zoomToFit(400, 40),
+    reset: () => { fgRef.current?.zoom(1, 250); fgRef.current?.centerAt(0, 0, 250) },
+    center: (node) => { fgRef.current?.centerAt(node.x ?? 0, node.y ?? 0, 350); fgRef.current?.zoom(2, 350) },
+  }), [])
 
-  const highlightSet = selectedIds
-  const hasSelection = selectedIds.size > 1
+  const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, scale: number) => {
+    const graphNode = node as GraphNode
+    const size = Math.max(4, 24 / (1 + Math.log(typeof graphNode.properties?.edges === 'number' ? graphNode.properties.edges : 1)))
+    const isSelected = graphNode.id === selectedNode?.id
+    ctx.globalAlpha = hasSelection && !isSelected && !upstream.has(graphNode.id) && !downstream.has(graphNode.id) ? 0.2 : 1
+    ctx.beginPath(); ctx.arc(node.x, node.y, size, 0, Math.PI * 2)
+    ctx.fillStyle = upstream.has(graphNode.id) ? '#ef4444' : downstream.has(graphNode.id) ? '#22c55e' : getNodeColor(graphNode)
+    ctx.fill()
+    if (isSelected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke() }
+    if (scale >= 0.7) { ctx.fillStyle = '#cbd5e1'; ctx.font = `${Math.max(10, 12 / scale)}px Inter`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(graphNode.displayName, node.x, node.y + size + 3) }
+    ctx.globalAlpha = 1
+  }, [selectedNode, hasSelection, upstream, downstream])
 
-  const nodeCanvasObject = useCallback(
-    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const gn = node as GraphNode
-      const label = gn.displayName
-      const edgeCount = typeof gn.properties?.edges === 'number' ? gn.properties.edges : 1
-const size = Math.max(4, 24 / (1 + Math.log(edgeCount)))
+  const linkColor = useCallback((link: any) => {
+    if (!hasSelection) return 'rgba(255,255,255,.16)'
+    const source = typeof link.source === 'object' ? link.source.id : link.source
+    const target = typeof link.target === 'object' ? link.target.id : link.target
+    if (upstream.has(source) || upstream.has(target)) return '#ef4444'
+    if (downstream.has(source) || downstream.has(target)) return '#22c55e'
+    return 'rgba(255,255,255,.04)'
+  }, [hasSelection, upstream, downstream])
 
-      const isSelected = gn.id === selectedNode?.id
-      const isHighlighted = highlightSet.has(gn.id)
+  const drawLinkLabel = useCallback((link: any, ctx: CanvasRenderingContext2D, scale: number) => {
+    const graphLink = link as GraphLink
+    if (!LABELED.has(graphLink.relationshipType) || scale < 0.8 || typeof link.source !== 'object' || typeof link.target !== 'object') return
+    const x = (link.source.x + link.target.x) / 2; const y = (link.source.y + link.target.y) / 2
+    ctx.font = `${Math.max(8, 9 / scale)}px Inter`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(203,213,225,.8)'; ctx.fillText(graphLink.relationshipType, x, y)
+  }, [])
 
-      let alpha = 1
-      if (hasSelection) {
-        alpha = isHighlighted ? 1 : 0.2
-      }
+  useEffect(() => { fgRef.current?.d3ReheatSimulation() }, [data])
+  const action = (value: GraphContextAction) => { if (!menu) return; if (value === 'center') fgRef.current && ref && fgRef.current.centerAt(menu.node.x ?? 0, menu.node.y ?? 0, 350); onContextAction?.(value, menu.node, direction, depth); setMenu(null) }
 
-      ctx.globalAlpha = alpha
-
-      if (isSelected) {
-        ctx.beginPath()
-        ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI)
-        ctx.fillStyle = 'rgba(255,255,255,0.9)'
-        ctx.fill()
-      }
-
-      ctx.beginPath()
-      ctx.arc(node.x, node.y, size, 0, 2 * Math.PI)
-      ctx.fillStyle = getNodeColor(gn)
-      ctx.fill()
-
-      if (isSelected) {
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 2
-        ctx.stroke()
-      }
-
-      if (globalScale >= 0.7) {
-        ctx.fillStyle = isSelected ? '#ffffff' : '#cbd5e1'
-        ctx.font = `${Math.max(10, 12 / globalScale)}px Inter, sans-serif`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'top'
-        ctx.fillText(label, node.x, node.y + size + 3)
-      }
-
-      ctx.globalAlpha = 1
-    },
-    [selectedNode, highlightSet, hasSelection],
-  )
-
-  const linkColor = useCallback(
-    (link: any) => {
-      if (!hasSelection) return 'rgba(255,255,255,0.15)'
-      const l = link as GraphLink
-      const sid = typeof l.source === 'object' ? (l.source as any).id : l.source
-      const tid = typeof l.target === 'object' ? (l.target as any).id : l.target
-      if (highlightSet.has(sid as string) && highlightSet.has(tid as string)) {
-        return 'rgba(255,255,255,0.5)'
-      }
-      return 'rgba(255,255,255,0.04)'
-    },
-    [hasSelection, highlightSet],
-  )
-
-  const handleClick = useCallback(
-    (node: any) => {
-      if (node) {
-        onNodeClick(node as GraphNode)
-      } else {
-        onBackgroundClick()
-      }
-    },
-    [onNodeClick, onBackgroundClick],
-  )
-
-  useEffect(() => {
-    if (fgRef.current) {
-      fgRef.current.d3ReheatSimulation()
-    }
-  }, [data])
-
-  return (
-    <div className="h-full w-full">
-      <ForceGraph2D
-        ref={fgRef}
-        graphData={data}
-        nodeCanvasObject={nodeCanvasObject}
-        linkColor={linkColor}
-        linkWidth={0.5}
-        linkDirectionalParticles={0}
-        linkDirectionalArrowLength={3}
-        linkDirectionalArrowRelPos={1}
-        onNodeClick={handleClick}
-        onBackgroundClick={handleClick}
-        cooldownTicks={100}
-        nodeRelSize={4}
-        d3AlphaDecay={0.02}
-        d3VelocityDecay={0.3}
-        enableNodeDrag={true}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
-        minZoom={0.1}
-        maxZoom={10}
-        width={800}
-        height={600}
-      />
-    </div>
-  )
-}
+  return <div className="relative h-full w-full" onClick={() => setMenu(null)}>
+    <ForceGraph2D ref={fgRef} graphData={data} nodeCanvasObject={nodeCanvasObject} linkColor={linkColor} linkWidth={0.7} linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1} linkCanvasObjectMode={() => 'after'} linkCanvasObject={drawLinkLabel} onNodeClick={(node: any) => onNodeClick(node as GraphNode)} onNodeRightClick={(node: any, event: MouseEvent) => { event.preventDefault(); setMenu({ node: node as GraphNode, x: event.offsetX, y: event.offsetY }) }} onBackgroundClick={onBackgroundClick} cooldownTicks={100} d3AlphaDecay={0.02} d3VelocityDecay={0.3} enableNodeDrag width={800} height={600} minZoom={0.1} maxZoom={10} />
+    {menu && <div className="absolute z-50 w-52 rounded border border-border bg-surface p-1 text-xs shadow-xl" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
+      <div className="border-b border-border px-2 py-1 font-medium text-gray-200">{menu.node.displayName}</div>
+      {([['details','Open details'],['profile','Open 360 profile'],['center','Center'],['collapse','Collapse'],['hide','Hide'],['pin','Pin'],['dependencies','Show dependencies']] as [GraphContextAction,string][]).map(([value,label]) => <button key={value} className="block w-full rounded px-2 py-1.5 text-left text-gray-300 hover:bg-white/5" onClick={() => action(value)}>{label}</button>)}
+      <div className="mt-1 border-t border-border p-1"><div className="mb-1 text-gray-500">Expand neighbors</div><div className="flex gap-1"><select value={direction} onChange={(event) => setDirection(event.target.value as typeof direction)} className="min-w-0 flex-1 bg-card"><option value="both">Both</option><option value="incoming">Incoming</option><option value="outgoing">Outgoing</option></select><select value={depth} onChange={(event) => setDepth(Number(event.target.value))} className="bg-card">{[1,2,3,4,5].map((value) => <option key={value}>{value}</option>)}</select><button className="rounded bg-primary px-2" onClick={() => action('expand')}>Go</button></div></div>
+    </div>}
+  </div>
+})

@@ -39,6 +39,8 @@ export interface GraphNode {
   y?: number
   vx?: number
   vy?: number
+  fx?: number
+  fy?: number
 }
 
 export interface GraphLink {
