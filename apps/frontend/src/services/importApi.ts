@@ -66,9 +66,13 @@ export async function getMappings(
   if (fileId) params.set('fileId', fileId)
   if (sheetIndex !== undefined) params.set('sheetIndex', String(sheetIndex))
 
-  const res = await fetch(`${API_BASE}/imports/${importId}/mappings?${params.toString()}`)
+  const sheetPath = fileId && sheetIndex !== undefined
+    ? `/imports/${importId}/files/${fileId}/sheets/${sheetIndex}/mappings`
+    : `/imports/${importId}/mappings?${params.toString()}`
+  const res = await fetch(`${API_BASE}${sheetPath}`)
   if (!res.ok) throw new Error('Failed to get mappings')
-  return res.json()
+  const result = await res.json()
+  return Array.isArray(result) ? result : [result]
 }
 
 export async function applyMappings(
@@ -82,10 +86,10 @@ export async function applyMappings(
   mappedCount: number
   ignoredCount: number
 }> {
-  const res = await fetch(`${API_BASE}/imports/${importId}/mappings`, {
-    method: 'POST',
+  const res = await fetch(`${API_BASE}/imports/${importId}/files/${body.fileId}/sheets/${body.sheetIndex}/mappings`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ overrides: body.overrides }),
   })
   if (!res.ok) throw new Error('Failed to apply mappings')
   return res.json()

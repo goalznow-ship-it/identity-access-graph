@@ -132,11 +132,17 @@ export class ImportsService {
   }
 
   setMappings(importId: string, fileId: string, sheetIndex: number, mappings: ColumnMapping[]): void {
-    this.mappingCache.set(this.sheetKey(importId, fileId, sheetIndex), mappings)
+    this.mappingCache.set(this.sheetKey(importId, fileId, sheetIndex), mappings.map((mapping) => ({ ...mapping })))
+    this.invalidateValidationResult(importId, fileId, sheetIndex)
   }
 
   getMappings(importId: string, fileId: string, sheetIndex: number): ColumnMapping[] | undefined {
-    return this.mappingCache.get(this.sheetKey(importId, fileId, sheetIndex))
+    return this.mappingCache.get(this.sheetKey(importId, fileId, sheetIndex))?.map((mapping) => ({ ...mapping }))
+  }
+
+  clearMappings(importId: string, fileId: string, sheetIndex: number): void {
+    this.mappingCache.delete(this.sheetKey(importId, fileId, sheetIndex))
+    this.invalidateValidationResult(importId, fileId, sheetIndex)
   }
 
   classify(importId: string, fileId: string, sheetIndex: number, type: string): ImportSession | null {
@@ -149,6 +155,7 @@ export class ImportsService {
     file.sheets[sheetIndex].manualOverride = type as any
     file.sheets[sheetIndex].classification = type as any
     file.status = 'classified'
+    this.clearMappings(importId, fileId, sheetIndex)
 
     return session
   }
@@ -162,6 +169,14 @@ export class ImportsService {
       (item) => item.fileId !== result.fileId || item.sheetIndex !== result.sheetIndex,
     )
     this.validationCache.set(importId, [...results, result])
+  }
+
+  invalidateValidationResult(importId: string, fileId: string, sheetIndex: number): void {
+    const remaining = this.getValidationResults(importId).filter(
+      (item) => item.fileId !== fileId || item.sheetIndex !== sheetIndex,
+    )
+    if (remaining.length > 0) this.validationCache.set(importId, remaining)
+    else this.validationCache.delete(importId)
   }
 
   getValidationResults(importId: string): ValidationResult[] {

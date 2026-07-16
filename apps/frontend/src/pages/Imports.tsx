@@ -46,6 +46,7 @@ export function ImportsPage() {
   const handleValidate = async () => {
     if (!session || !selectedFile) return
     try {
+      await columnMapping.apply()
       const result = await validation.validate(session.importId, { fileId: selectedFile.id, sheetIndex })
       setValidationResult(result)
       setStep('validate')

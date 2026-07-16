@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import { MappingService } from '../mapping/mapping.service'
 import { ValidationService } from '../validation/validation.service'
 import { generateNormalizedPreview } from '../validation/normalized-preview'
+import { ImportsService } from '../imports.service'
 
 describe('import mapping and validation', () => {
   const mappingService = new MappingService()
@@ -49,5 +50,29 @@ describe('import mapping and validation', () => {
 
     assert.equal(record.mapped.email, 'user@example.com')
     assert.equal(record.mapped.status, 'ACTIVE')
+  })
+
+  it('persists manual and ignored mappings and invalidates stale validation', () => {
+    const service = new ImportsService()
+    const mappings = mappingService.applyMappings(
+      mappingService.suggestMappings(['mail', 'notes'], [], 'Users'),
+      [
+        { sourceColumn: 'mail', targetField: 'userPrincipalName', ignored: false },
+        { sourceColumn: 'notes', targetField: 'notes', ignored: true },
+      ],
+    )
+    service.setValidationResult('import-1', {
+      importId: 'import-1', fileId: 'file-1', sheetIndex: 0,
+      issues: [], summary: { total: 0, info: 0, warning: 0, error: 0, critical: 0 },
+    })
+
+    service.setMappings('import-1', 'file-1', 0, mappings)
+    const stored = service.getMappings('import-1', 'file-1', 0)!
+
+    assert.equal(stored[0].targetField, 'userPrincipalName')
+    assert.equal(stored[1].ignored, true)
+    assert.deepEqual(service.getValidationResults('import-1'), [])
+    stored[0].targetField = 'email'
+    assert.equal(service.getMappings('import-1', 'file-1', 0)![0].targetField, 'userPrincipalName')
   })
 })

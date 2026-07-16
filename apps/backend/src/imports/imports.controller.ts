@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, HttpCode, HttpException, HttpStatus,
+  Controller, Post, Put, Get, HttpCode, HttpException, HttpStatus,
   UseInterceptors, UploadedFiles, Param, Body, Query,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger'
@@ -122,7 +122,8 @@ export class ImportsController {
     }
 
     const sheet = file.sheets[body.sheetIndex]
-    const current = this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
+    const current = this.service.getMappings(importId, body.fileId, body.sheetIndex)
+      ?? this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
     const updated = this.mappingService.applyMappings(current, body.overrides)
     this.service.setMappings(importId, body.fileId, body.sheetIndex, updated)
 
@@ -134,6 +135,38 @@ export class ImportsController {
       mappedCount: updated.filter((m) => !m.ignored).length,
       ignoredCount: updated.filter((m) => m.ignored).length,
     }
+  }
+
+  @Get(':importId/files/:fileId/sheets/:sheetIndex/mappings')
+  @ApiOperation({ summary: 'Get mappings for one sheet' })
+  getSheetMappings(
+    @Param('importId') importId: string,
+    @Param('fileId') fileId: string,
+    @Param('sheetIndex') sheetIndexValue: string,
+  ) {
+    const sheetIndex = Number(sheetIndexValue)
+    if (!Number.isInteger(sheetIndex) || sheetIndex < 0) {
+      throw new HttpException('Invalid sheetIndex.', HttpStatus.BAD_REQUEST)
+    }
+    const results = this.getMappings(importId, fileId, String(sheetIndex))
+    if (results.length === 0) throw new HttpException('File or sheet not found.', HttpStatus.NOT_FOUND)
+    return results[0]
+  }
+
+  @Put(':importId/files/:fileId/sheets/:sheetIndex/mappings')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Replace mappings for one sheet' })
+  applySheetMappings(
+    @Param('importId') importId: string,
+    @Param('fileId') fileId: string,
+    @Param('sheetIndex') sheetIndexValue: string,
+    @Body() body: Pick<ApplyMappingsRequest, 'overrides'>,
+  ) {
+    const sheetIndex = Number(sheetIndexValue)
+    if (!Number.isInteger(sheetIndex) || sheetIndex < 0) {
+      throw new HttpException('Invalid sheetIndex.', HttpStatus.BAD_REQUEST)
+    }
+    return this.applyMappings(importId, { fileId, sheetIndex, overrides: body.overrides })
   }
 
   @Post(':importId/validate')
