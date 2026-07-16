@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useGraphData } from '../hooks/useGraphData'
@@ -19,6 +19,8 @@ import {
   RelationshipDrawer,
   GraphHistory,
   GraphStatusBar,
+  GraphMiniMap,
+  GraphWorkspaceControls,
 } from '../components/graph'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
@@ -34,6 +36,7 @@ import { getNode as getNeo4jNode, searchNodes as searchNeo4jNodes } from '../ser
 import { adaptNeo4jNode } from '../services/neo4jGraphAdapter'
 import { Neo4jStatusBadge } from '../components/Neo4jStatusBadge'
 import { loadSettings } from '../services/navigation'
+import { clusterGraph, filterGraphView, loadLayout, saveLayout, type GraphClusterMode, type GraphViewMode, type SavedGraphView } from '../services/graphPresentation'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
@@ -70,12 +73,15 @@ export function GraphPage() {
     allStatuses,
     allAccessTypes,
   } = useGraphFilters(data)
-  const { visibleData, expand, collapse, hide } = useGraphExpansion(filteredData)
+  const [viewMode,setViewMode]=useState<GraphViewMode>('overview')
+  const [clusterMode,setClusterMode]=useState<GraphClusterMode>('none')
+  const presentedData=useMemo(()=>clusterGraph(filterGraphView(filteredData,viewMode),clusterMode),[filteredData,viewMode,clusterMode])
+  const { visibleData, visibleIds, expand, collapse, hide } = useGraphExpansion(presentedData)
   const investigation = useGraphInvestigation(visibleData)
 
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
-  const [layout, setLayout] = useState<GraphLayout>('force')
+  const [layout, setLayout] = useState<GraphLayout>(()=>typeof localStorage==='undefined'?'force':loadLayout(localStorage,source))
   const [selectedLink, setSelectedLink] = useState<GraphLink | null>(null)
   const [frozen, setFrozen] = useState(false)
   const [zoom, setZoom] = useState(1)
@@ -126,7 +132,7 @@ export function GraphPage() {
   const handleToggleFullscreen = useCallback(() => {
     setFullscreen((v) => !v)
   }, [])
-  const handleLayoutChange = (next: GraphLayout) => { setLayout(next); fgRef.current?.setLayout(next) }
+  const handleLayoutChange = (next: GraphLayout) => { setLayout(next); if(typeof localStorage!=='undefined')saveLayout(localStorage,source,next); fgRef.current?.setLayout(next) }
   const handleExport = (format: 'png' | 'json' | 'csv' | 'cypher') => { if (format === 'png') fgRef.current?.exportPng(); else exportGraph(investigation.focusedData, format) }
 
   const handleSearchSelect = useCallback(
@@ -140,6 +146,7 @@ export function GraphPage() {
   const handleNodeClick = useCallback(
     (node: any) => {
       selectNode(node)
+      fgRef.current?.center(node)
       if (source === 'neo4j') void getNeo4jNode(node.id).then((full) => selectNode(adaptNeo4jNode(full))).catch(() => undefined)
     },
     [selectNode, source],
@@ -154,13 +161,13 @@ export function GraphPage() {
     setSource(next); clearSelection()
   }
 
-  const pinNode = (node: GraphNode) => { node.fx = node.x ?? 0; node.fy = node.y ?? 0 }
+  const pinNode = (node: GraphNode) => { node.fx = node.x ?? 0; node.fy = node.y ?? 0;node.properties.__pinned=true }
   const showDependencies = (node: GraphNode) => { selectNode(node); setHighlightMode('all') }
   const handleContextAction = (action: GraphContextAction, node: GraphNode, direction: ExpansionDirection = 'both', depth = 1) => {
     if (action === 'details') selectNode(node)
     if (action === 'profile') navigate(`/identities/${node.id}`)
     if (action === 'center') fgRef.current?.center(node)
-    if (action === 'expand') { if (source === 'neo4j') void expandRemote(node.id, direction, Math.min(depth, 3)); else expand(node.id, direction, depth) }
+    if (action === 'expand') { if(node.properties.isCluster===true)setClusterMode('none');else if (source === 'neo4j') void expandRemote(node.id, direction, Math.min(depth, 3)); else expand(node.id, direction, depth) }
     if (action === 'collapse') collapse(node.id)
     if (action === 'hide') { hide(node.id); if (selectedNode?.id === node.id) clearSelection() }
     if (action === 'pin') pinNode(node)
@@ -175,7 +182,7 @@ export function GraphPage() {
       if (event.key.toLowerCase() === 'f') fgRef.current?.fit()
       if (event.key === '[') investigation.back()
       if (event.key === ']') investigation.forward()
-      const layouts: Record<string, GraphLayout> = { '1': 'force', '2': 'hierarchy', '3': 'radial', '4': 'concentric' }
+      const layouts: Record<string, GraphLayout> = { '1': 'force', '2': 'hierarchy-lr', '3': 'radial', '4': 'concentric' }
       if (layouts[event.key]) { setLayout(layouts[event.key]); fgRef.current?.setLayout(layouts[event.key]) }
     }
     window.addEventListener('keydown', handler)
@@ -183,6 +190,9 @@ export function GraphPage() {
   }, [clearSelection, investigation.back, investigation.forward])
 
   useEffect(() => { if (source !== 'neo4j' || !error || typeof localStorage === 'undefined') return; if (loadSettings(localStorage).autoFallback) { setFallbackNotice(`Neo4j Live unavailable: ${error}. Switched to Mock Enterprise.`); setSource('mock') } }, [source, error, setSource])
+  useEffect(()=>{if(typeof localStorage==='undefined')return;const next=loadLayout(localStorage,source);setLayout(next);window.setTimeout(()=>fgRef.current?.setLayout(next),0)},[source])
+
+  const loadSavedView=(view:SavedGraphView)=>{setSource(view.source);setViewMode(view.viewMode);setClusterMode(view.clustering);setLayout(view.layout);setSystemFilter(view.filters.systems);setNodeTypeFilter(view.filters.nodeTypes);setRelationshipTypeFilter(view.filters.relationshipTypes);setRiskLevelFilter(view.filters.riskLevels);setStatusFilter(view.filters.statuses);setAccessFilter(view.filters.accessTypes);window.setTimeout(()=>fgRef.current?.setLayout(view.layout),0)}
 
   if (loading) {
     return (
@@ -227,9 +237,8 @@ export function GraphPage() {
             <select value={source} onChange={(event) => handleSourceChange(event.target.value as GraphSourceMode)} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="mock">Mock Enterprise</option><option value="imported" disabled={!importedId}>Imported Session</option><option value="neo4j">Neo4j Live</option></select>
             {source==='neo4j'&&<Neo4jStatusBadge details/>}
             <div className="flex items-center justify-between text-[10px] text-gray-500"><span>Active source</span><b className="rounded bg-primary/15 px-1.5 py-0.5 uppercase text-primary">{source}</b></div>
-            <label className="block pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Layout</label>
-            <select value={layout} onChange={(event) => handleLayoutChange(event.target.value as GraphLayout)} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="force">Force</option><option value="hierarchy">Hierarchy</option><option value="radial">Radial</option><option value="concentric">Concentric</option></select>
           </div>
+          <GraphWorkspaceControls viewMode={viewMode} clustering={clusterMode} layout={layout} onViewMode={setViewMode} onClustering={setClusterMode} onLayout={handleLayoutChange} onLoad={loadSavedView} snapshot={{layout,filters,source,focusedNode:selectedNode?.id,expandedNodes:[...visibleIds],clustering:clusterMode,viewMode}} />
           <div className="mt-4">
             <GraphFilters
               filters={filters}
@@ -253,7 +262,6 @@ export function GraphPage() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Legend</p>
             <GraphLegend />
           </div>
-          <div className="mt-4 rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-gray-500">Saved views<br/><span className="text-gray-600">No saved workspace yet</span></div>
           <div className="mt-3 text-[10px] text-gray-600">Ctrl+K commands · F fit · 1–4 layouts · [ / ] history · Esc clear</div>
         </motion.aside>
       )}
@@ -298,7 +306,7 @@ export function GraphPage() {
           />
         </div>
 
-        <div ref={graphContainerRef} className="flex-1 overflow-hidden">
+        <div ref={graphContainerRef} className="relative flex-1 overflow-hidden">
           <GraphCanvas
             ref={fgRef}
             data={investigation.focusedData}
@@ -309,7 +317,7 @@ export function GraphPage() {
             onBackgroundClick={handleBackgroundClick}
             onContextAction={handleContextAction}
             onLinkClick={(link) => setSelectedLink(link)}
-            onNodeDoubleClick={(node) => { if(source==='neo4j')void expandRemote(node.id,'both',1);else expand(node.id,'both',1) }}
+            onNodeDoubleClick={(node) => { if(node.properties.isCluster===true)setClusterMode('none');else if(source==='neo4j')void expandRemote(node.id,'both',1);else expand(node.id,'both',1) }}
             selectedLinkId={selectedLink?.id}
             shortestPathNodeIds={investigation.path?.nodeIds}
             shortestPathLinkIds={investigation.path?.linkIds}
@@ -317,8 +325,9 @@ export function GraphPage() {
             attackPathLinkIds={investigation.attack?.linkIds}
             onZoomChange={setZoom}
           />
+          <GraphMiniMap data={investigation.focusedData} selected={selectedNode} onNavigate={(x,y)=>fgRef.current?.centerAt(x,y)} />
         </div>
-        <GraphStatusBar nodes={investigation.focusedData.nodes.length} links={investigation.focusedData.links.length} selected={selectedNode} mode={investigation.attack ? 'Attack path' : investigation.path ? 'Shortest path' : investigation.blast ? 'Blast radius' : highlightMode} layout={layout} source={source} zoom={zoom} />
+        <GraphStatusBar nodes={investigation.focusedData.nodes.length} links={investigation.focusedData.links.length} hidden={Math.max(0,filteredData.nodes.length-investigation.focusedData.nodes.length)} selected={selectedNode} mode={investigation.attack ? 'Attack path' : investigation.path ? 'Shortest path' : investigation.blast ? 'Blast radius' : highlightMode} view={viewMode} layout={layout} source={source} zoom={zoom} />
       </div>
 
       {investigationOpen && <motion.aside id="graph-investigation" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute inset-y-0 right-0 z-30 w-[min(22rem,100vw)] overflow-y-auto border-l border-border bg-surface/95 p-4 shadow-2xl backdrop-blur xl:static xl:w-72 xl:shadow-none">

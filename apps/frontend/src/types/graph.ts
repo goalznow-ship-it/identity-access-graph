@@ -66,9 +66,9 @@ export interface GraphFiltersState {
   searchQuery: string
 }
 
-export type GraphLayout = 'force' | 'hierarchy' | 'radial' | 'concentric'
+export type GraphLayout = 'force' | 'hierarchy-lr' | 'hierarchy-td' | 'radial' | 'concentric' | 'department' | 'source'
 
-export type HighlightMode = 'none' | 'direct' | 'all'
+export type HighlightMode = 'none' | 'direct' | 'two-hop' | 'all'
 
 export interface DependencyInfo {
   upstream: string[]

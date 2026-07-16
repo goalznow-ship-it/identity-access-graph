@@ -58,7 +58,7 @@ export function GraphToolbar({
       <button className={tool} onClick={onResetView} title="Reset view">↺<span className="ml-1 hidden xl:inline">Reset</span></button>
       <button className={`${tool} ${frozen ? 'bg-primary/15 text-primary' : ''}`} onClick={onFreeze} title={frozen ? 'Resume graph physics' : 'Freeze graph physics'}>{frozen ? '▶' : '❄'}<span className="ml-1 hidden xl:inline">{frozen ? 'Resume' : 'Freeze'}</span></button>
       <button className={tool} onClick={onToggleFullscreen} title="Fullscreen">⛶</button>
-      <select aria-label="Graph layout" title="Layout" value={layout} onChange={(event) => onLayoutChange(event.target.value as GraphLayout)} className="h-8 rounded border border-border bg-card px-1 text-xs"><option value="force">Force</option><option value="hierarchy">Hierarchy</option><option value="radial">Radial</option><option value="concentric">Concentric</option></select>
+      <select aria-label="Graph layout" title="Layout" value={layout} onChange={(event) => onLayoutChange(event.target.value as GraphLayout)} className="h-8 rounded border border-border bg-card px-1 text-xs"><option value="force">Force</option><option value="hierarchy-lr">Hierarchy L→R</option><option value="hierarchy-td">Hierarchy T→B</option><option value="radial">Radial</option><option value="concentric">Concentric</option><option value="department">Departments</option><option value="source">Sources</option></select>
       <span className="mx-1 h-5 w-px shrink-0 bg-border" />
       <button className={tool} onClick={onSearch} title="Search nodes (Ctrl+K)">⌕<span className="ml-1 hidden 2xl:inline">Search</span></button>
       <button className={tool} onClick={onFilters} title="Toggle filters">◫<span className="ml-1 hidden 2xl:inline">Filters</span></button>
@@ -83,6 +83,7 @@ export function GraphToolbar({
           >
             Reachable
           </button>
+          <button className={`${tool} ${highlightMode === 'two-hop' ? 'bg-primary/15 text-primary' : ''}`} onClick={() => onHighlightModeChange('two-hop')} title="Highlight two-hop neighborhood">2-hop</button>
           <button className={tool} onClick={() => onHighlightModeChange('none')} title="Clear highlighting">×</button>
         </>
       )}
