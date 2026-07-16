@@ -14,11 +14,13 @@ interface GraphCanvasProps {
   onNodeClick: (node: GraphNode | null) => void
   onBackgroundClick: () => void
   onContextAction?: (action: GraphContextAction, node: GraphNode, direction?: 'both' | 'incoming' | 'outgoing', depth?: number) => void
+  attackPathNodeIds?: string[]
+  attackPathLinkIds?: string[]
 }
 
 const LABELED = new Set(['MEMBER_OF', 'HAS_ROLE', 'HAS_ACCESS_TO', 'REPORTS_TO', 'BELONGS_TO', 'RUNS_ON', 'SUPPORTS', 'USES'])
 
-export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas({ data, selectedNode, highlightMode, dependencyInfo, onNodeClick, onBackgroundClick, onContextAction }, ref) {
+export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas({ data, selectedNode, highlightMode, dependencyInfo, onNodeClick, onBackgroundClick, onContextAction, attackPathNodeIds = [], attackPathLinkIds = [] }, ref) {
   const fgRef = useRef<any>(null)
   const [menu, setMenu] = useState<{ node: GraphNode; x: number; y: number } | null>(null)
   const [direction, setDirection] = useState<'both' | 'incoming' | 'outgoing'>('both')
@@ -26,6 +28,8 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   const upstream = useMemo(() => new Set(dependencyInfo ? [...dependencyInfo.upstream, ...dependencyInfo.allUpstream] : []), [dependencyInfo])
   const downstream = useMemo(() => new Set(dependencyInfo ? [...dependencyInfo.downstream, ...dependencyInfo.allDownstream] : []), [dependencyInfo])
   const hasSelection = Boolean(selectedNode && highlightMode !== 'none')
+  const attackNodes = useMemo(() => new Set(attackPathNodeIds), [attackPathNodeIds])
+  const attackLinks = useMemo(() => new Set(attackPathLinkIds), [attackPathLinkIds])
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 250),
@@ -41,21 +45,22 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     const isSelected = graphNode.id === selectedNode?.id
     ctx.globalAlpha = hasSelection && !isSelected && !upstream.has(graphNode.id) && !downstream.has(graphNode.id) ? 0.2 : 1
     ctx.beginPath(); ctx.arc(node.x, node.y, size, 0, Math.PI * 2)
-    ctx.fillStyle = upstream.has(graphNode.id) ? '#ef4444' : downstream.has(graphNode.id) ? '#22c55e' : getNodeColor(graphNode)
+    ctx.fillStyle = attackNodes.has(graphNode.id) ? '#f97316' : upstream.has(graphNode.id) ? '#ef4444' : downstream.has(graphNode.id) ? '#22c55e' : getNodeColor(graphNode)
     ctx.fill()
     if (isSelected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke() }
     if (scale >= 0.7) { ctx.fillStyle = '#cbd5e1'; ctx.font = `${Math.max(10, 12 / scale)}px Inter`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(graphNode.displayName, node.x, node.y + size + 3) }
     ctx.globalAlpha = 1
-  }, [selectedNode, hasSelection, upstream, downstream])
+  }, [selectedNode, hasSelection, upstream, downstream, attackNodes])
 
   const linkColor = useCallback((link: any) => {
+    if (attackLinks.has(link.id)) return '#f97316'
     if (!hasSelection) return 'rgba(255,255,255,.16)'
     const source = typeof link.source === 'object' ? link.source.id : link.source
     const target = typeof link.target === 'object' ? link.target.id : link.target
     if (upstream.has(source) || upstream.has(target)) return '#ef4444'
     if (downstream.has(source) || downstream.has(target)) return '#22c55e'
     return 'rgba(255,255,255,.04)'
-  }, [hasSelection, upstream, downstream])
+  }, [hasSelection, upstream, downstream, attackLinks])
 
   const drawLinkLabel = useCallback((link: any, ctx: CanvasRenderingContext2D, scale: number) => {
     const graphLink = link as GraphLink

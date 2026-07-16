@@ -5,6 +5,7 @@ import { useGraphData } from '../hooks/useGraphData'
 import { useGraphSelection } from '../hooks/useGraphSelection'
 import { useGraphFilters } from '../hooks/useGraphFilters'
 import { useGraphExpansion, type ExpansionDirection } from '../hooks/useGraphExpansion'
+import { useGraphInvestigation } from '../hooks/useGraphInvestigation'
 import {
   GraphCanvas,
   GraphToolbar,
@@ -13,6 +14,7 @@ import {
   GraphStats,
   NodeDetailsDrawer,
   GraphSearch,
+  GraphInvestigationPanel,
 } from '../components/graph'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
@@ -49,6 +51,7 @@ export function GraphPage() {
     allRiskLevels,
   } = useGraphFilters(data)
   const { visibleData, expand, collapse, hide } = useGraphExpansion(filteredData)
+  const investigation = useGraphInvestigation(visibleData)
 
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
@@ -167,6 +170,21 @@ export function GraphPage() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Legend</p>
             <GraphLegend />
           </div>
+          <GraphInvestigationPanel
+            data={visibleData}
+            path={investigation.path}
+            blast={investigation.blast}
+            attack={investigation.attack}
+            onShortest={investigation.runShortestPath}
+            onBlast={investigation.runBlastRadius}
+            onAttack={investigation.runAttackPath}
+            onFocus={investigation.focusNode}
+            onRestore={investigation.restore}
+            onBack={investigation.back}
+            onForward={investigation.forward}
+            canBack={investigation.canBack}
+            canForward={investigation.canForward}
+          />
         </aside>
       )}
 
@@ -200,13 +218,15 @@ export function GraphPage() {
         <div ref={graphContainerRef} className="flex-1 overflow-hidden">
           <GraphCanvas
             ref={fgRef}
-            data={visibleData}
+            data={investigation.focusedData}
             selectedNode={selectedNode}
             highlightMode={highlightMode}
             dependencyInfo={dependencyInfo}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
             onContextAction={handleContextAction}
+            attackPathNodeIds={investigation.attack?.nodeIds}
+            attackPathLinkIds={investigation.attack?.linkIds}
           />
         </div>
       </div>
