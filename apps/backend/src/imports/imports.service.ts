@@ -8,6 +8,8 @@ import { classify } from './classification/classifier'
 import type { ImportFile, ImportSession, DatasetType } from './types'
 import type { ValidationResult } from './validation/validation.service'
 import type { ColumnMapping } from './mapping/mapping.service'
+import type { CorrelationResult } from './correlation'
+import type { ConversionResult } from './graph-conversion'
 
 const UPLOAD_DIR = path.resolve(process.cwd(), '.imports-tmp')
 const MAX_FILE_SIZE = 50 * 1024 * 1024
@@ -28,6 +30,8 @@ export class ImportsService {
   private sessions = new Map<string, ImportSession>()
   private validationCache = new Map<string, ValidationResult[]>()
   private mappingCache = new Map<string, ColumnMapping[]>()
+  private correlationCache = new Map<string, CorrelationResult>()
+  private conversionCache = new Map<string, ConversionResult>()
 
   private sheetKey(importId: string, fileId: string, sheetIndex: number): string {
     return `${importId}:${fileId}:${sheetIndex}`
@@ -134,6 +138,7 @@ export class ImportsService {
   setMappings(importId: string, fileId: string, sheetIndex: number, mappings: ColumnMapping[]): void {
     this.mappingCache.set(this.sheetKey(importId, fileId, sheetIndex), mappings.map((mapping) => ({ ...mapping })))
     this.invalidateValidationResult(importId, fileId, sheetIndex)
+    this.clearDerivedResults(importId)
   }
 
   getMappings(importId: string, fileId: string, sheetIndex: number): ColumnMapping[] | undefined {
@@ -143,6 +148,7 @@ export class ImportsService {
   clearMappings(importId: string, fileId: string, sheetIndex: number): void {
     this.mappingCache.delete(this.sheetKey(importId, fileId, sheetIndex))
     this.invalidateValidationResult(importId, fileId, sheetIndex)
+    this.clearDerivedResults(importId)
   }
 
   classify(importId: string, fileId: string, sheetIndex: number, type: string): ImportSession | null {
@@ -183,6 +189,12 @@ export class ImportsService {
     return this.validationCache.get(importId) ?? []
   }
 
+  setCorrelationResult(importId: string, result: CorrelationResult): void { this.correlationCache.set(importId, result); this.conversionCache.delete(importId) }
+  getCorrelationResult(importId: string): CorrelationResult | undefined { return this.correlationCache.get(importId) }
+  setConversionResult(importId: string, result: ConversionResult): void { this.conversionCache.set(importId, result) }
+  getConversionResult(importId: string): ConversionResult | undefined { return this.conversionCache.get(importId) }
+  clearDerivedResults(importId: string): void { this.correlationCache.delete(importId); this.conversionCache.delete(importId) }
+
   private cleanupSession(importId: string): void {
     const session = this.sessions.get(importId)
     if (session) {
@@ -195,6 +207,7 @@ export class ImportsService {
       }
       this.sessions.delete(importId)
       this.validationCache.delete(importId)
+      this.clearDerivedResults(importId)
       for (const key of this.mappingCache.keys()) {
         if (key.startsWith(`${importId}:`)) this.mappingCache.delete(key)
       }

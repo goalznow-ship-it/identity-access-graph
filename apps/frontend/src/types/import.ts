@@ -4,6 +4,7 @@ export type DatasetType =
   | 'Computers' | 'Linux Hosts' | 'Linux Users' | 'Linux Groups'
   | 'Sudo Policies' | 'SSH Keys'
   | 'Applications' | 'Databases' | 'Business Services' | 'Service Accounts'
+  | 'Organizational Units' | 'Domains'
   | 'Unknown'
 
 export type ImportStatus = 'uploading' | 'uploaded' | 'inspected' | 'classified' | 'error' | 'mapped' | 'validated'
@@ -117,4 +118,47 @@ export interface ApplyMappingsRequest {
 export interface ValidateRequest {
   fileId: string
   sheetIndex: number
+}
+
+export type CorrelationConfidence = 'EXACT' | 'HIGH' | 'MEDIUM' | 'LOW' | 'CONFLICT'
+export interface CorrelationGroup {
+  canonicalIdentityId: string
+  matchedRecordIds: string[]
+  sourceSystems: string[]
+  matchMethod: string
+  confidence: CorrelationConfidence
+  conflicts: string[]
+  mergedFields: Record<string, unknown>
+  conflictingFields: string[]
+  manualReviewRequired: boolean
+}
+export interface CorrelationResult {
+  importId: string
+  groups: CorrelationGroup[]
+  recordToCanonical: Record<string, string>
+  summary: Record<CorrelationConfidence, number> & { records: number; identities: number; recordsMerged: number }
+}
+export interface UnresolvedReference { recordId: string; field: string; value: string; relationshipType: string; reason: string }
+export interface ImportGraphPreview {
+  nodes: import('./graph').GraphNode[]
+  links: import('./graph').GraphLink[]
+  correlationGroups: CorrelationGroup[]
+  unresolvedReferences: UnresolvedReference[]
+  conflicts: string[]
+  warnings: string[]
+  pagination: { nodeLimit: number; relationshipLimit: number; totalNodes: number; totalRelationships: number; truncated: boolean }
+}
+export interface ConversionResult {
+  nodesCreated: number
+  relationshipsCreated: number
+  recordsMerged: number
+  duplicateNodesSkipped: number
+  unresolvedReferences: UnresolvedReference[]
+  conflicts: string[]
+  manualReviewItems: { canonicalIdentityId?: string; recordIds: string[]; reasons: string[] }[]
+  nodeTypeCounts: Record<string, number>
+  relationshipTypeCounts: Record<string, number>
+  sourceSystemCounts: Record<string, number>
+  correlationSummary: CorrelationResult['summary']
+  preview: ImportGraphPreview
 }

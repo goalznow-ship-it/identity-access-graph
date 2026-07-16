@@ -9,6 +9,9 @@ import { MappingService } from './mapping/mapping.service'
 import { ValidationService } from './validation/validation.service'
 import { generateNormalizedPreview } from './validation/normalized-preview'
 import type { ClassifyRequest, ApplyMappingsRequest, ValidateRequest } from './types'
+import { IdentityCorrelationService, type CorrelationOptions, type CorrelationRecord } from './correlation'
+import { GraphConversionService } from './graph-conversion'
+import { deterministicId } from './graph-conversion/deterministic-id'
 
 @ApiTags('Imports')
 @Controller('imports')
@@ -17,6 +20,8 @@ export class ImportsController {
     private readonly service: ImportsService,
     private readonly mappingService: MappingService,
     private readonly validationService: ValidationService,
+    private readonly correlationService: IdentityCorrelationService,
+    private readonly conversionService: GraphConversionService,
   ) {}
 
   @Post('upload')
@@ -234,5 +239,80 @@ export class ImportsController {
       }
     }
     return results
+  }
+
+  private buildCorrelationRecords(importId: string): CorrelationRecord[] {
+    const session = this.service.getSession(importId)
+    if (!session) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
+    const validations = this.service.getValidationResults(importId)
+    const records: CorrelationRecord[] = []
+    for (const file of session.files) {
+      for (let sheetIndex = 0; sheetIndex < file.sheets.length; sheetIndex++) {
+        const sheet = file.sheets[sheetIndex]
+        const mappings = this.service.getMappings(importId, file.id, sheetIndex)
+          ?? this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
+        const normalized = generateNormalizedPreview(sheet.previewRows, mappings, sheet.previewRows.length)
+        const validation = validations.find((result) => result.fileId === file.id && result.sheetIndex === sheetIndex)
+        for (const record of normalized) {
+          const hasError = validation?.issues.some((issue) => issue.row === record.row && ['ERROR', 'CRITICAL'].includes(issue.severity))
+          records.push({
+            recordId: deterministicId('record', importId, file.id, sheetIndex, record.row),
+            sourceSystem: String(record.mapped.sourceSystem ?? 'CUSTOM'), fields: record.mapped,
+            fileId: file.id, fileName: file.originalName, sheetIndex, sheetName: sheet.name, row: record.row,
+            datasetType: sheet.classification, validationStatus: hasError ? 'INVALID' : 'VALID', raw: record.original,
+          })
+        }
+      }
+    }
+    return records
+  }
+
+  @Post(':importId/correlate')
+  @HttpCode(200)
+  correlate(@Param('importId') importId: string, @Body() options: CorrelationOptions = {}) {
+    const result = this.correlationService.correlate(importId, this.buildCorrelationRecords(importId), options)
+    this.service.setCorrelationResult(importId, result)
+    return result
+  }
+
+  @Get(':importId/correlation')
+  getCorrelation(@Param('importId') importId: string) {
+    if (!this.service.getSession(importId)) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
+    const result = this.service.getCorrelationResult(importId)
+    if (!result) throw new HttpException('Correlation has not been run.', HttpStatus.NOT_FOUND)
+    return result
+  }
+
+  @Post(':importId/convert')
+  @HttpCode(200)
+  convert(@Param('importId') importId: string, @Body() body: { nodeLimit?: number; relationshipLimit?: number } = {}) {
+    const records = this.buildCorrelationRecords(importId)
+    const correlation = this.service.getCorrelationResult(importId) ?? this.correlationService.correlate(importId, records)
+    this.service.setCorrelationResult(importId, correlation)
+    const result = this.conversionService.convert(importId, records, correlation, body.nodeLimit ?? 500, body.relationshipLimit ?? 2000)
+    this.service.setConversionResult(importId, result)
+    return result
+  }
+
+  @Get(':importId/graph-preview')
+  getGraphPreview(@Param('importId') importId: string, @Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
+    const requestedLimits = nodeLimit !== undefined || relationshipLimit !== undefined
+    const parsedNodeLimit = Number(nodeLimit ?? 500)
+    const parsedRelationshipLimit = Number(relationshipLimit ?? 2000)
+    if (requestedLimits && (!Number.isInteger(parsedNodeLimit) || parsedNodeLimit < 0 || !Number.isInteger(parsedRelationshipLimit) || parsedRelationshipLimit < 0)) {
+      throw new HttpException('Preview limits must be non-negative integers.', HttpStatus.BAD_REQUEST)
+    }
+    if (requestedLimits) return this.convert(importId, { nodeLimit: parsedNodeLimit, relationshipLimit: parsedRelationshipLimit }).preview
+    const result = this.service.getConversionResult(importId)
+    if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
+    return result.preview
+  }
+
+  @Get(':importId/conversion-summary')
+  getConversionSummary(@Param('importId') importId: string) {
+    const result = this.service.getConversionResult(importId)
+    if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
+    const { preview: _preview, ...summary } = result
+    return summary
   }
 }

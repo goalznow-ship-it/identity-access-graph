@@ -15,6 +15,8 @@ export type RelationshipType =
   | 'APPLIES_TO' | 'HAS_ACCESS' | 'OWNS' | 'DEPENDS_ON'
   | 'LINKED_TO' | 'HOSTED_ON' | 'LOCATED_IN' | 'AUTHENTICATES_TO'
   | 'MANAGES_THROUGH'
+  | 'HAS_ROLE' | 'GRANTS' | 'HAS_ACCESS_TO' | 'EXISTS_IN' | 'USES'
+  | 'SUPPORTS' | 'MANAGED_BY' | 'HAS_SSH_KEY' | 'HAS_SUDO_POLICY'
 
 export type SourceSystem =
   | 'ACTIVE_DIRECTORY' | 'FREE_IPA' | 'LINUX'

@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Upload, UploadCloud, RefreshCw, ChevronRight, CheckCircle } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { FileDropzone, UploadedFileList, WorkbookInspector, ColumnMappingEditor, ValidationSummary, ValidationIssueList, NormalizedPreview } from '../components/imports'
+import { FileDropzone, UploadedFileList, WorkbookInspector, ColumnMappingEditor, ValidationSummary, ValidationIssueList, NormalizedPreview, IdentityCorrelationSummary, CorrelationGroupCard, CorrelationConflictList, GraphConversionSummary, ImportGraphPreview, UnresolvedReferenceList } from '../components/imports'
 import { useFileImport } from '../hooks/useFileImport'
 import { useColumnMapping } from '../hooks/useColumnMapping'
 import { useImportValidation } from '../hooks/useImportValidation'
+import { useIdentityCorrelation } from '../hooks/useIdentityCorrelation'
+import { useGraphConversion } from '../hooks/useGraphConversion'
 import type { ImportFile, SheetInfo, ValidationResult, NormalizedRecord } from '../types/import'
 
-type ImportStep = 'upload' | 'classify' | 'map' | 'validate' | 'preview'
+type ImportStep = 'upload' | 'classify' | 'map' | 'validate' | 'preview' | 'correlate' | 'graphPreview'
 
 export function ImportsPage() {
+  const navigate = useNavigate()
   const {
     pendingFiles, session, uploading, error,
     addFiles, removeFile, clearFiles, upload, classify, setError,
@@ -31,6 +35,8 @@ export function ImportsPage() {
   })
 
   const validation = useImportValidation()
+  const correlation = useIdentityCorrelation()
+  const conversion = useGraphConversion()
 
   const handleFileSelect = (file: ImportFile, index = 0) => {
     setSelectedFile(file)
@@ -67,6 +73,18 @@ export function ImportsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load preview')
     }
+  }
+
+  const handleCorrelation = async () => {
+    if (!session) return
+    try { await correlation.correlate(session.importId); setStep('correlate') }
+    catch (e) { setError(e instanceof Error ? e.message : 'Correlation failed') }
+  }
+
+  const handleConversion = async () => {
+    if (!session) return
+    try { await conversion.convert(session.importId); setStep('graphPreview') }
+    catch (e) { setError(e instanceof Error ? e.message : 'Graph conversion failed') }
   }
 
   return (
@@ -163,6 +181,8 @@ export function ImportsPage() {
             >
               4. Preview
             </button>
+            <button className={`px-3 py-1 text-xs rounded ${step === 'correlate' ? 'bg-primary text-white' : 'bg-gray-800 text-gray-300'}`} onClick={() => setStep('correlate')} disabled={!correlation.result}>5. Correlation</button>
+            <button className={`px-3 py-1 text-xs rounded ${step === 'graphPreview' ? 'bg-primary text-white' : 'bg-gray-800 text-gray-300'}`} onClick={() => setStep('graphPreview')} disabled={!conversion.result}>6. Graph Preview</button>
           </div>
 
           {step === 'classify' && (
@@ -245,10 +265,24 @@ export function ImportsPage() {
                 <Button variant="ghost" onClick={() => setStep('validate')}>
                   Back to Validation
                 </Button>
-                <span className="text-xs text-gray-500">Graph conversion is intentionally not enabled in this phase.</span>
+                <Button onClick={handleCorrelation} disabled={correlation.loading}>Correlate Identities</Button>
               </div>
             </div>
           )}
+
+          {step === 'correlate' && correlation.result && <div className="space-y-4">
+            <IdentityCorrelationSummary result={correlation.result} />
+            <CorrelationConflictList groups={correlation.result.groups} />
+            <div className="max-h-64 space-y-2 overflow-auto">{correlation.result.groups.slice(0, 50).map((group) => <CorrelationGroupCard key={group.canonicalIdentityId} group={group} />)}</div>
+            <div className="flex gap-2"><Button variant="ghost" onClick={() => setStep('preview')}>Back to Preview</Button><Button onClick={handleConversion} disabled={conversion.loading}>Convert to Graph</Button></div>
+          </div>}
+
+          {step === 'graphPreview' && conversion.result && <div className="space-y-4">
+            <GraphConversionSummary result={conversion.result} />
+            <ImportGraphPreview preview={conversion.result.preview} />
+            <UnresolvedReferenceList items={conversion.result.unresolvedReferences} />
+            <Button onClick={() => session && navigate(`/graph?importId=${session.importId}`)}>Open imported graph in Graph Explorer</Button>
+          </div>}
         </div>
       )}
     </div>

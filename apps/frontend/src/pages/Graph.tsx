@@ -14,9 +14,11 @@ import {
 } from '../components/graph'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
+import { useSearchParams } from 'react-router-dom'
 
 export function GraphPage() {
-  const { data, loading, error } = useGraphData()
+  const [searchParams] = useSearchParams()
+  const { data, loading, error } = useGraphData(searchParams.get('importId'))
   const links = data?.links ?? []
   const {
     selectedNode,

@@ -4,6 +4,7 @@ export type DatasetType =
   | 'Computers' | 'Linux Hosts' | 'Linux Users' | 'Linux Groups'
   | 'Sudo Policies' | 'SSH Keys'
   | 'Applications' | 'Databases' | 'Business Services' | 'Service Accounts'
+  | 'Organizational Units' | 'Domains'
   | 'Unknown'
 
 export type ImportStatus = 'uploading' | 'uploaded' | 'inspected' | 'classified' | 'error'

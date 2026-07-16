@@ -6,6 +6,9 @@ import type {
   NormalizedRecord,
   ApplyMappingsRequest,
   ValidateRequest,
+  CorrelationResult,
+  ConversionResult,
+  ImportGraphPreview,
 } from '../types/import'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -24,6 +27,41 @@ export async function uploadFiles(files: File[]): Promise<ImportSession> {
     throw new Error(text || 'Upload failed')
   }
 
+  return res.json()
+}
+
+export async function correlateImport(importId: string, compositeKeyFields?: string[]): Promise<CorrelationResult> {
+  const res = await fetch(`${API_BASE}/imports/${importId}/correlate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ compositeKeyFields }),
+  })
+  if (!res.ok) throw new Error('Identity correlation failed')
+  return res.json()
+}
+
+export async function getCorrelation(importId: string): Promise<CorrelationResult> {
+  const res = await fetch(`${API_BASE}/imports/${importId}/correlation`)
+  if (!res.ok) throw new Error('Correlation result not found')
+  return res.json()
+}
+
+export async function convertImport(importId: string, nodeLimit = 500, relationshipLimit = 2000): Promise<ConversionResult> {
+  const res = await fetch(`${API_BASE}/imports/${importId}/convert`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodeLimit, relationshipLimit }),
+  })
+  if (!res.ok) throw new Error('Graph conversion failed')
+  return res.json()
+}
+
+export async function getImportGraphPreview(importId: string, nodeLimit = 500, relationshipLimit = 2000): Promise<ImportGraphPreview> {
+  const params = new URLSearchParams({ nodeLimit: String(nodeLimit), relationshipLimit: String(relationshipLimit) })
+  const res = await fetch(`${API_BASE}/imports/${importId}/graph-preview?${params}`)
+  if (!res.ok) throw new Error('Imported graph preview not found')
+  return res.json()
+}
+
+export async function getConversionSummary(importId: string): Promise<Omit<ConversionResult, 'preview'>> {
+  const res = await fetch(`${API_BASE}/imports/${importId}/conversion-summary`)
+  if (!res.ok) throw new Error('Conversion summary not found')
   return res.json()
 }
 
