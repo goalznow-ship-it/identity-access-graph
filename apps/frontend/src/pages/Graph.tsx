@@ -26,6 +26,8 @@ import { useSearchParams } from 'react-router-dom'
 import type { GraphCanvasHandle, GraphContextAction } from '../components/graph/GraphCanvas'
 import type { GraphLayout, GraphLink, GraphNode } from '../types/graph'
 import { exportGraph } from '../services/graphExport'
+import { parseGraphQuery } from '../services/navigation'
+import type { NodeType, RiskLevel, SourceSystem } from '../types/graph'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
@@ -72,6 +74,21 @@ export function GraphPage() {
   const [investigationOpen, setInvestigationOpen] = useState(true)
   const graphContainerRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<GraphCanvasHandle>(null)
+
+  useEffect(() => {
+    const query = parseGraphQuery(searchParams)
+    setNodeTypeFilter(query.nodeType ? [query.nodeType as NodeType] : [])
+    setSystemFilter(query.sourceSystem ? [query.sourceSystem as SourceSystem] : [])
+    setRiskLevelFilter(query.risk ? [query.risk as RiskLevel] : [])
+    setStatusFilter(query.status ? [query.status] : [])
+    if (query.mode === 'investigation') setInvestigationOpen(true)
+  }, [searchParams, setNodeTypeFilter, setSystemFilter, setRiskLevelFilter, setStatusFilter])
+
+  useEffect(() => {
+    const nodeId = searchParams.get('nodeId'); if (!nodeId || !data) return
+    const node = data.nodes.find((candidate) => candidate.id === nodeId); if (!node) return
+    selectNode(node); window.setTimeout(() => fgRef.current?.center(node), 120)
+  }, [data, searchParams, selectNode])
 
   const handleZoomIn = useCallback(() => {
     fgRef.current?.zoomIn()

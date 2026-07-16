@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import App from './App'
-import { Home, PipelinePage, GraphPage, UserProfilePage, LinuxAdminPage, BusinessQuestionsPage, ImportsPage } from './pages'
+import { Home, PipelinePage, GraphPage, UserProfilePage, LinuxAdminPage, BusinessQuestionsPage, ImportsPage, IdentitiesPage, GroupsPage, AccessPage, SettingsPage, NotFoundPage } from './pages'
 
 export const router = createBrowserRouter([
   {
@@ -19,9 +19,18 @@ export const router = createBrowserRouter([
         element: <GraphPage />,
       },
       {
+        path: '/identities',
+        element: <IdentitiesPage />,
+      },
+      {
         path: '/identities/:userId',
         element: <UserProfilePage />,
       },
+      { path: '/groups', element: <GroupsPage /> },
+      { path: '/access', element: <AccessPage /> },
+      { path: '/access/policies', element: <AccessPage /> },
+      { path: '/access/roles', element: <AccessPage /> },
+      { path: '/settings', element: <SettingsPage /> },
       {
         path: '/linux-admin',
         element: <LinuxAdminPage />,
@@ -34,6 +43,7 @@ export const router = createBrowserRouter([
         path: '/imports',
         element: <ImportsPage />,
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

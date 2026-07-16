@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Share2,
@@ -50,7 +50,7 @@ const menuGroups: MenuGroup[] = [
         path: '/identities',
         children: [
           { label: 'All Identities', path: '/identities' },
-          { label: 'Groups', path: '/identities/groups' },
+          { label: 'Groups', path: '/groups' },
         ],
       },
       {
@@ -77,9 +77,10 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
 
-  const isActive = (path: string) => pathname === path
+  const isActive = (path: string) => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`))
   const isActiveParent = (item: MenuItem) =>
     isActive(item.path) ||
     item.children?.some((c) => isActive(c.path))
@@ -133,6 +134,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     {collapsed ? (
                       <Tooltip content={item.label} side="right">
                         <button
+                          onClick={() => navigate(item.path)}
+                          aria-label={`Open ${item.label}`}
                           className={`flex w-full items-center justify-center rounded-lg p-2.5 text-sm font-medium
                             transition-all duration-200 hover:bg-white/[0.03]
                             ${active ? 'bg-primary-muted text-primary' : 'text-gray-400 hover:text-gray-200'}`}
@@ -144,6 +147,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                       <button
                         onClick={() => {
                           if (hasChildren) toggleSubMenu(item.label)
+                          navigate(item.path)
                         }}
                         className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium
                           transition-all duration-200
@@ -166,6 +170,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         {item.children!.map((child) => (
                           <button
                             key={child.label}
+                            onClick={() => navigate(child.path)}
                             className={`block w-full rounded-md px-3 py-1.5 text-left text-sm transition-colors duration-200
                               ${
                                 isActive(child.path)

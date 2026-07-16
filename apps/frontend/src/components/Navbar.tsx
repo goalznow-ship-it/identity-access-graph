@@ -1,33 +1,11 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, Bell, Sun, User } from '../components/icons'
+import { useGraphData } from '../hooks/useGraphData'
+import { nodeDestination, searchNavigationNodes } from '../services/navigation'
 
 export function Navbar() {
-  return (
-    <nav className="fixed inset-x-0 top-0 z-50 h-14 border-b border-border bg-background/70 backdrop-blur-xl">
-      <div className="flex h-full items-center justify-between px-3 sm:px-6">
-        <span className="text-lg font-semibold text-gray-100">
-          <span className="hidden sm:inline">Identity Access Graph</span><span className="sm:hidden">IAG</span>
-        </span>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-gray-400">
-            <Search className="h-4 w-4" />
-            <span className="hidden md:inline">Search...</span>
-          </div>
-
-          <button className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200">
-            <Bell className="h-5 w-5" />
-          </button>
-
-          <button className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200">
-            <Sun className="h-5 w-5" />
-          </button>
-
-          <div className="flex items-center gap-2 rounded-lg p-1.5 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200">
-            <User className="h-5 w-5" />
-            <span className="hidden md:inline">Admin</span>
-          </div>
-        </div>
-      </div>
-    </nav>
-  )
+  const { data } = useGraphData(); const navigate = useNavigate(); const [query, setQuery] = useState(''); const [active, setActive] = useState(0); const results = searchNavigationNodes(data?.nodes ?? [], query)
+  const select = (index: number) => { const node = results[index]; if (!node) return; navigate(nodeDestination(node)); setQuery('') }
+  return <nav className="fixed inset-x-0 top-0 z-50 h-14 border-b border-border bg-background/70 backdrop-blur-xl"><div className="flex h-full items-center justify-between px-3 sm:px-6"><button onClick={() => navigate('/')} className="text-lg font-semibold text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"><span className="hidden sm:inline">Identity Access Graph</span><span className="sm:hidden">IAG</span></button><div className="flex items-center gap-4"><div className="relative"><label className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-gray-400 focus-within:border-primary"><Search className="h-4 w-4"/><input aria-label="Search identities and assets" value={query} onChange={(event) => { setQuery(event.target.value); setActive(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setActive((value) => Math.min(results.length - 1, value + 1)) } if (event.key === 'ArrowUp') { event.preventDefault(); setActive((value) => Math.max(0, value - 1)) } if (event.key === 'Enter') select(active); if (event.key === 'Escape') setQuery('') }} placeholder="Search identities and assets" className="hidden w-56 bg-transparent text-gray-200 outline-none md:block"/></label>{query && <div className="absolute right-0 top-11 w-80 overflow-hidden rounded-lg border border-border bg-surface shadow-2xl">{results.map((node, index) => <button key={node.id} onMouseDown={() => select(index)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs ${index === active ? 'bg-primary/10 text-white' : 'text-gray-400 hover:bg-white/5'}`}><span>{node.displayName}</span><span className="text-[10px] text-gray-600">{node.nodeType}</span></button>)}{results.length === 0 && <p className="p-3 text-xs text-gray-500">No matching identities or assets.</p>}</div>}</div><button disabled title="No unread notifications" aria-label="Notifications: none unread" className="rounded-lg p-2 text-gray-600 disabled:cursor-not-allowed"><Bell className="h-5 w-5"/></button><button aria-label="Toggle color theme" title="Toggle color theme" onClick={() => document.documentElement.classList.toggle('light')} className="rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-gray-200"><Sun className="h-5 w-5"/></button><button onClick={() => navigate('/settings')} aria-label="Open administrator settings" className="flex items-center gap-2 rounded-lg p-1.5 text-sm text-gray-400 hover:bg-white/5 hover:text-gray-200"><User className="h-5 w-5"/><span className="hidden md:inline">Admin</span></button></div></div></nav>
 }
