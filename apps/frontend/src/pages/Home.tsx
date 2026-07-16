@@ -1,15 +1,17 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { useGraphData } from '../hooks/useGraphData'
+import { DashboardEmpty, DashboardGrid, DashboardHeader, DashboardSkeleton } from '../components/dashboard'
+
+function DashboardContent({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
+  const { data, loading, error } = useGraphData()
+  if (loading) return <DashboardSkeleton />
+  if (error || !data) return <DashboardEmpty onRetry={onRefresh} />
+  return <><DashboardHeader nodes={data.nodes.length} onRefresh={onRefresh} refreshing={refreshing} /><div className="mt-5"><DashboardGrid data={data} /></div></>
+}
 
 export function Home() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex h-full items-center justify-center"
-    >
-      <h1 className="text-4xl font-bold text-gray-800">
-        Identity Access Graph Platform
-      </h1>
-    </motion.div>
-  )
+  const [revision, setRevision] = useState(0); const [refreshing, setRefreshing] = useState(false)
+  const refresh = () => { setRefreshing(true); setRevision((value) => value + 1); window.setTimeout(() => setRefreshing(false), 700) }
+  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .25 }} className="mx-auto max-w-[1800px] pb-8"><DashboardContent key={revision} onRefresh={refresh} refreshing={refreshing} /></motion.div>
 }

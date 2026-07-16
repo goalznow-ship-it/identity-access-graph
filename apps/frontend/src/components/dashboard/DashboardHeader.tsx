@@ -1,0 +1,6 @@
+import { RefreshCw, Shield as ShieldCheck } from 'lucide-react'
+import { Badge } from '../ui/Badge'
+
+export function DashboardHeader({ nodes, onRefresh, refreshing }: { nodes: number; onRefresh: () => void; refreshing: boolean }) {
+  return <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between"><div><div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[.18em] text-primary"><ShieldCheck className="h-4 w-4" /> Identity security operations</div><h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-100">Enterprise Control Center</h1><p className="mt-1 text-sm text-gray-500">Unified identity posture, access intelligence and operational health</p></div><div className="flex flex-wrap items-center gap-2 text-xs"><Badge variant="success">Production</Badge><Badge variant="info">Mock graph</Badge><span className="rounded-full border border-border px-3 py-1 text-gray-400">Enterprise dataset · {nodes.toLocaleString()} objects</span><span className="text-gray-500">Synchronized 2 minutes ago</span><button onClick={onRefresh} className="rounded-lg border border-border bg-card p-2 text-gray-400 transition hover:text-white" title="Refresh dashboard"><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></header>
+}
