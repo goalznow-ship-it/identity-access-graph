@@ -1,9 +1,9 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import type { DependencyInfo, GraphData, GraphLink, GraphNode, HighlightMode } from '../../types/graph'
+import type { DependencyInfo, GraphData, GraphLayout, GraphLink, GraphNode, HighlightMode } from '../../types/graph'
 import { getNodeColor } from '../../services/graphDataAdapter'
 
-export interface GraphCanvasHandle { zoomIn: () => void; zoomOut: () => void; fit: () => void; reset: () => void; center: (node: GraphNode) => void }
+export interface GraphCanvasHandle { zoomIn: () => void; zoomOut: () => void; fit: () => void; reset: () => void; center: (node: GraphNode) => void; setLayout: (layout: GraphLayout) => void; exportPng: () => void }
 export type GraphContextAction = 'details' | 'profile' | 'center' | 'expand' | 'collapse' | 'hide' | 'pin' | 'dependencies'
 
 interface GraphCanvasProps {
@@ -30,6 +30,17 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   const hasSelection = Boolean(selectedNode && highlightMode !== 'none')
   const attackNodes = useMemo(() => new Set(attackPathNodeIds), [attackPathNodeIds])
   const attackLinks = useMemo(() => new Set(attackPathLinkIds), [attackPathLinkIds])
+  const dense = data.links.length > 150 || data.links.length > data.nodes.length * 4
+
+  const applyLayout = useCallback((layout: GraphLayout) => {
+    const nodes = data.nodes
+    if (layout === 'force') { nodes.forEach((node) => { node.fx = undefined; node.fy = undefined }); fgRef.current?.d3ReheatSimulation(); return }
+    const groups = new Map<string, GraphNode[]>(); nodes.forEach((node) => { const key = layout === 'hierarchy' ? node.nodeType : node.nodeType; if (!groups.has(key)) groups.set(key, []); groups.get(key)!.push(node) })
+    if (layout === 'radial') nodes.forEach((node, index) => { const angle = index / Math.max(1,nodes.length) * Math.PI * 2; node.fx = Math.cos(angle) * 260; node.fy = Math.sin(angle) * 260 })
+    if (layout === 'hierarchy') [...groups.values()].forEach((group, row) => group.forEach((node, column) => { node.fx = (column - (group.length - 1) / 2) * 110; node.fy = (row - (groups.size - 1) / 2) * 100 }))
+    if (layout === 'concentric') [...groups.values()].forEach((group, ring) => group.forEach((node, index) => { const radius = 70 + ring * 70; const angle = index / Math.max(1,group.length) * Math.PI * 2; node.fx = Math.cos(angle) * radius; node.fy = Math.sin(angle) * radius }))
+    fgRef.current?.d3ReheatSimulation(); window.setTimeout(() => fgRef.current?.zoomToFit(300, 40), 50)
+  }, [data.nodes])
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 250),
@@ -37,7 +48,9 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     fit: () => fgRef.current?.zoomToFit(400, 40),
     reset: () => { fgRef.current?.zoom(1, 250); fgRef.current?.centerAt(0, 0, 250) },
     center: (node) => { fgRef.current?.centerAt(node.x ?? 0, node.y ?? 0, 350); fgRef.current?.zoom(2, 350) },
-  }), [])
+    setLayout: applyLayout,
+    exportPng: () => { const canvas = document.querySelector('.graph-canvas-host canvas') as HTMLCanvasElement | null; if (!canvas) return; const link = document.createElement('a'); link.download = 'identity-graph.png'; link.href = canvas.toDataURL('image/png'); link.click() },
+  }), [applyLayout])
 
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, scale: number) => {
     const graphNode = node as GraphNode
@@ -64,15 +77,15 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
 
   const drawLinkLabel = useCallback((link: any, ctx: CanvasRenderingContext2D, scale: number) => {
     const graphLink = link as GraphLink
-    if (!LABELED.has(graphLink.relationshipType) || scale < 0.8 || typeof link.source !== 'object' || typeof link.target !== 'object') return
+    if (dense || !LABELED.has(graphLink.relationshipType) || scale < 0.8 || typeof link.source !== 'object' || typeof link.target !== 'object') return
     const x = (link.source.x + link.target.x) / 2; const y = (link.source.y + link.target.y) / 2
     ctx.font = `${Math.max(8, 9 / scale)}px Inter`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(203,213,225,.8)'; ctx.fillText(graphLink.relationshipType, x, y)
-  }, [])
+  }, [dense])
 
   useEffect(() => { fgRef.current?.d3ReheatSimulation() }, [data])
   const action = (value: GraphContextAction) => { if (!menu) return; if (value === 'center') fgRef.current && ref && fgRef.current.centerAt(menu.node.x ?? 0, menu.node.y ?? 0, 350); onContextAction?.(value, menu.node, direction, depth); setMenu(null) }
 
-  return <div className="relative h-full w-full" onClick={() => setMenu(null)}>
+  return <div className="graph-canvas-host relative h-full w-full" onClick={() => setMenu(null)}>
     <ForceGraph2D ref={fgRef} graphData={data} nodeCanvasObject={nodeCanvasObject} linkColor={linkColor} linkWidth={0.7} linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1} linkCanvasObjectMode={() => 'after'} linkCanvasObject={drawLinkLabel} onNodeClick={(node: any) => onNodeClick(node as GraphNode)} onNodeRightClick={(node: any, event: MouseEvent) => { event.preventDefault(); setMenu({ node: node as GraphNode, x: event.offsetX, y: event.offsetY }) }} onBackgroundClick={onBackgroundClick} cooldownTicks={100} d3AlphaDecay={0.02} d3VelocityDecay={0.3} enableNodeDrag width={800} height={600} minZoom={0.1} maxZoom={10} />
     {menu && <div className="absolute z-50 w-52 rounded border border-border bg-surface p-1 text-xs shadow-xl" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
       <div className="border-b border-border px-2 py-1 font-medium text-gray-200">{menu.node.displayName}</div>

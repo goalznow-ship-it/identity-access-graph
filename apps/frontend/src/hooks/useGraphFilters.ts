@@ -8,12 +8,17 @@ interface UseGraphFiltersReturn {
   setNodeTypeFilter: (types: GraphFiltersState['nodeTypes']) => void
   setRelationshipTypeFilter: (types: GraphFiltersState['relationshipTypes']) => void
   setRiskLevelFilter: (levels: GraphFiltersState['riskLevels']) => void
+  setStatusFilter: (statuses: string[]) => void
+  setAccessFilter: (types: GraphFiltersState['accessTypes']) => void
+  applyPreset: (preset: 'privileged' | 'highRisk' | 'identities' | 'infrastructure') => void
   setSearchQuery: (query: string) => void
   resetFilters: () => void
   allNodeTypes: string[]
   allRelationshipTypes: string[]
   allSourceSystems: string[]
   allRiskLevels: string[]
+  allStatuses: string[]
+  allAccessTypes: string[]
 }
 
 export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
@@ -22,6 +27,8 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
     nodeTypes: [],
     relationshipTypes: [],
     riskLevels: [],
+    statuses: [],
+    accessTypes: [],
     searchQuery: '',
   })
 
@@ -48,6 +55,8 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
     const set = new Set(data.nodes.map((n) => n.riskLevel))
     return Array.from(set)
   }, [data])
+  const allStatuses = useMemo(() => Array.from(new Set((data?.nodes ?? []).map((node) => String(node.properties.status ?? 'UNKNOWN')))), [data])
+  const allAccessTypes = useMemo(() => Array.from(new Set((data?.links ?? []).map((link) => link.relationshipType).filter((type) => ['HAS_ACCESS_TO','HAS_ACCESS','HAS_ROLE','GRANTS','HAS_PERMISSION','MEMBER_OF'].includes(type)))), [data])
 
   const filteredData = useMemo(() => {
     if (!data) return { nodes: [], links: [] }
@@ -74,6 +83,20 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
       const nodeIds = new Set(nodes.filter((n) => rl.has(n.riskLevel)).map((n) => n.id))
       nodes = nodes.filter((n) => nodeIds.has(n.id))
       links = links.filter((l) => nodeIds.has(l.source as string) && nodeIds.has(l.target as string))
+    }
+
+    if (filters.statuses.length > 0) {
+      const statuses = new Set(filters.statuses)
+      const nodeIds = new Set(nodes.filter((node) => statuses.has(String(node.properties.status ?? 'UNKNOWN'))).map((node) => node.id))
+      nodes = nodes.filter((node) => nodeIds.has(node.id))
+      links = links.filter((link) => nodeIds.has(typeof link.source === 'object' ? (link.source as any).id : link.source) && nodeIds.has(typeof link.target === 'object' ? (link.target as any).id : link.target))
+    }
+
+    if (filters.accessTypes.length > 0) {
+      const access = new Set(filters.accessTypes)
+      links = links.filter((link) => access.has(link.relationshipType))
+      const nodeIds = new Set(links.flatMap((link) => [typeof link.source === 'object' ? (link.source as any).id : link.source, typeof link.target === 'object' ? (link.target as any).id : link.target]))
+      nodes = nodes.filter((node) => nodeIds.has(node.id))
     }
 
     if (filters.relationshipTypes.length > 0) {
@@ -113,13 +136,22 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
   const setRiskLevelFilter = useCallback((levels: GraphFiltersState['riskLevels']) => {
     setFilters((prev) => ({ ...prev, riskLevels: levels }))
   }, [])
+  const setStatusFilter = useCallback((statuses: string[]) => setFilters((previous) => ({ ...previous, statuses })), [])
+  const setAccessFilter = useCallback((accessTypes: GraphFiltersState['accessTypes']) => setFilters((previous) => ({ ...previous, accessTypes })), [])
+  const applyPreset = useCallback((preset: 'privileged' | 'highRisk' | 'identities' | 'infrastructure') => {
+    const presets: Record<typeof preset, Partial<GraphFiltersState>> = {
+      privileged: { accessTypes: ['HAS_ROLE','GRANTS','HAS_PERMISSION','HAS_ACCESS_TO'] }, highRisk: { riskLevels: ['HIGH','CRITICAL'] },
+      identities: { nodeTypes: ['USER','GROUP','ROLE','SERVICE_ACCOUNT','LINUX_USER','LINUX_GROUP'] }, infrastructure: { nodeTypes: ['HOST','COMPUTER','APPLICATION','DATABASE','BUSINESS_SERVICE'] },
+    }
+    setFilters((previous) => ({ ...previous, systems: [], nodeTypes: [], relationshipTypes: [], riskLevels: [], statuses: [], accessTypes: [], searchQuery: '', ...presets[preset] }))
+  }, [])
 
   const setSearchQuery = useCallback((query: string) => {
     setFilters((prev) => ({ ...prev, searchQuery: query }))
   }, [])
 
   const resetFilters = useCallback(() => {
-    setFilters({ systems: [], nodeTypes: [], relationshipTypes: [], riskLevels: [], searchQuery: '' })
+    setFilters({ systems: [], nodeTypes: [], relationshipTypes: [], riskLevels: [], statuses: [], accessTypes: [], searchQuery: '' })
   }, [])
 
   return {
@@ -129,11 +161,16 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
     setNodeTypeFilter,
     setRelationshipTypeFilter,
     setRiskLevelFilter,
+    setStatusFilter,
+    setAccessFilter,
+    applyPreset,
     setSearchQuery,
     resetFilters,
     allNodeTypes,
     allRelationshipTypes,
     allSourceSystems,
     allRiskLevels,
+    allStatuses,
+    allAccessTypes,
   }
 }

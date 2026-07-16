@@ -61,8 +61,12 @@ export interface GraphFiltersState {
   nodeTypes: NodeType[]
   relationshipTypes: RelationshipType[]
   riskLevels: RiskLevel[]
+  statuses: string[]
+  accessTypes: RelationshipType[]
   searchQuery: string
 }
+
+export type GraphLayout = 'force' | 'hierarchy' | 'radial' | 'concentric'
 
 export type HighlightMode = 'none' | 'direct' | 'all'
 

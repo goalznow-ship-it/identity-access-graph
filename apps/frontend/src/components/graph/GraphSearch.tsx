@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Search } from 'lucide-react'
 import type { GraphNode, GraphData } from '../../types/graph'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 interface GraphSearchProps {
   data: GraphData | null
@@ -9,19 +10,22 @@ interface GraphSearchProps {
 
 export function GraphSearch({ data, onSelect }: GraphSearchProps) {
   const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query)
 
   const results = useMemo(() => {
-    if (!query.trim() || !data) return []
-    const q = query.toLowerCase()
+    if (!debouncedQuery.trim() || !data) return []
+    const q = debouncedQuery.toLowerCase()
     return data.nodes
       .filter(
         (n) =>
           n.displayName.toLowerCase().includes(q) ||
           n.id.toLowerCase().includes(q) ||
-          (n.sourceId && n.sourceId.toLowerCase().includes(q)),
+          Boolean(n.sourceId && n.sourceId.toLowerCase().includes(q)) ||
+          String(n.properties.employeeId ?? '').toLowerCase().includes(q) ||
+          String(n.properties.email ?? '').toLowerCase().includes(q),
       )
       .slice(0, 20)
-  }, [query, data])
+  }, [debouncedQuery, data])
 
   return (
     <div className="relative">

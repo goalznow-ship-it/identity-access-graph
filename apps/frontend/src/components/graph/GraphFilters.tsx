@@ -9,10 +9,15 @@ interface GraphFiltersProps {
   allRelationshipTypes: string[]
   allSourceSystems: string[]
   allRiskLevels: string[]
+  allStatuses: string[]
+  allAccessTypes: string[]
   onSystemFilter: (systems: SourceSystem[]) => void
   onNodeTypeFilter: (types: NodeType[]) => void
   onRelationshipTypeFilter: (types: RelationshipType[]) => void
   onRiskLevelFilter: (levels: RiskLevel[]) => void
+  onStatusFilter: (statuses: string[]) => void
+  onAccessFilter: (types: RelationshipType[]) => void
+  onPreset: (preset: 'privileged' | 'highRisk' | 'identities' | 'infrastructure') => void
   onReset: () => void
 }
 
@@ -77,6 +82,8 @@ export function GraphFilters(props: GraphFiltersProps) {
         </Button>
       </div>
 
+      <div className="grid grid-cols-2 gap-1">{([['privileged','Privileged'],['highRisk','High risk'],['identities','Identities'],['infrastructure','Infrastructure']] as const).map(([value,label]) => <button key={value} onClick={() => props.onPreset(value)} className="rounded bg-card px-2 py-1 text-[10px] text-gray-300 hover:bg-white/5">{label}</button>)}</div>
+
       <Section title="Source System">
         <MultiSelect
           label="systems"
@@ -112,6 +119,8 @@ export function GraphFilters(props: GraphFiltersProps) {
           onChange={(v) => props.onRiskLevelFilter(v as RiskLevel[])}
         />
       </Section>
+      <Section title="Status"><MultiSelect label="statuses" options={props.allStatuses} selected={props.filters.statuses} onChange={props.onStatusFilter} /></Section>
+      <Section title="Access"><MultiSelect label="access types" options={props.allAccessTypes} selected={props.filters.accessTypes} onChange={(values) => props.onAccessFilter(values as RelationshipType[])} /></Section>
     </div>
   )
 }

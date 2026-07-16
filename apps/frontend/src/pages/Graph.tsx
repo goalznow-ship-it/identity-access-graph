@@ -15,12 +15,14 @@ import {
   NodeDetailsDrawer,
   GraphSearch,
   GraphInvestigationPanel,
+  GraphCommandPalette,
 } from '../components/graph'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
 import { useSearchParams } from 'react-router-dom'
 import type { GraphCanvasHandle, GraphContextAction } from '../components/graph/GraphCanvas'
-import type { GraphNode } from '../types/graph'
+import type { GraphLayout, GraphNode } from '../types/graph'
+import { exportGraph } from '../services/graphExport'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
@@ -44,17 +46,23 @@ export function GraphPage() {
     setNodeTypeFilter,
     setRelationshipTypeFilter,
     setRiskLevelFilter,
+    setStatusFilter,
+    setAccessFilter,
+    applyPreset,
     resetFilters,
     allNodeTypes,
     allRelationshipTypes,
     allSourceSystems,
     allRiskLevels,
+    allStatuses,
+    allAccessTypes,
   } = useGraphFilters(data)
   const { visibleData, expand, collapse, hide } = useGraphExpansion(filteredData)
   const investigation = useGraphInvestigation(visibleData)
 
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
+  const [layout, setLayout] = useState<GraphLayout>('force')
   const graphContainerRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<GraphCanvasHandle>(null)
 
@@ -77,6 +85,8 @@ export function GraphPage() {
   const handleToggleFullscreen = useCallback(() => {
     setFullscreen((v) => !v)
   }, [])
+  const handleLayoutChange = (next: GraphLayout) => { setLayout(next); fgRef.current?.setLayout(next) }
+  const handleExport = (format: 'png' | 'json' | 'csv' | 'cypher') => { if (format === 'png') fgRef.current?.exportPng(); else exportGraph(investigation.focusedData, format) }
 
   const handleSearchSelect = useCallback(
     (node: any) => {
@@ -159,10 +169,15 @@ export function GraphPage() {
               allRelationshipTypes={allRelationshipTypes}
               allSourceSystems={allSourceSystems}
               allRiskLevels={allRiskLevels}
+              allStatuses={allStatuses}
+              allAccessTypes={allAccessTypes}
               onSystemFilter={setSystemFilter}
               onNodeTypeFilter={setNodeTypeFilter}
               onRelationshipTypeFilter={setRelationshipTypeFilter}
               onRiskLevelFilter={setRiskLevelFilter}
+              onStatusFilter={setStatusFilter}
+              onAccessFilter={setAccessFilter}
+              onPreset={applyPreset}
               onReset={resetFilters}
             />
           </div>
@@ -212,6 +227,9 @@ export function GraphPage() {
             source={source}
             importedAvailable={Boolean(importedId)}
             onSourceChange={handleSourceChange}
+            layout={layout}
+            onLayoutChange={handleLayoutChange}
+            onExport={handleExport}
           />
         </div>
 
@@ -239,6 +257,7 @@ export function GraphPage() {
         onPin={pinNode}
         onDependencies={showDependencies}
       />
+      <GraphCommandPalette data={data} onSelect={handleSearchSelect} onFit={handleFitToScreen} onFullscreen={handleToggleFullscreen} onClearFilters={resetFilters} />
     </motion.div>
   )
 }
