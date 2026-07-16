@@ -1,4 +1,5 @@
 import type { GraphLayout, HighlightMode } from '../../types/graph'
+import type { GraphSourceMode } from '../../types/neo4j'
 
 interface GraphToolbarProps {
   onZoomIn: () => void
@@ -17,9 +18,9 @@ interface GraphToolbarProps {
   highlightMode: HighlightMode
   onHighlightModeChange: (mode: HighlightMode) => void
   hasSelection: boolean
-  source: 'mock' | 'imported'
+  source: GraphSourceMode
   importedAvailable: boolean
-  onSourceChange: (source: 'mock' | 'imported') => void
+  onSourceChange: (source: GraphSourceMode) => void
   layout: GraphLayout
   onLayoutChange: (layout: GraphLayout) => void
   onExport: (format: 'png' | 'json' | 'csv' | 'cypher') => void
@@ -66,7 +67,7 @@ export function GraphToolbar({
       <button className={tool} onClick={onAttackPath} title="Attack path panel">⚠<span className="ml-1 hidden 2xl:inline">Attack</span></button>
       <select aria-label="Export graph" title="Export" defaultValue="" onChange={(event) => { if (event.target.value) onExport(event.target.value as 'png' | 'json' | 'csv' | 'cypher'); event.currentTarget.value = '' }} className="h-8 rounded border border-border bg-card px-1 text-xs"><option value="">Export</option><option value="png">PNG</option><option value="json">JSON</option><option value="csv">CSV</option><option value="cypher">Cypher</option></select>
       <button className="sr-only" onClick={onZoomIn}>Zoom in</button><button className="sr-only" onClick={onZoomOut}>Zoom out</button>
-      <select className="sr-only" value={source} onChange={(event) => onSourceChange(event.target.value as 'mock' | 'imported')}><option value="mock">Mock</option><option value="imported" disabled={!importedAvailable}>Imported</option></select>
+      <select className="sr-only" value={source} onChange={(event) => onSourceChange(event.target.value as GraphSourceMode)}><option value="mock">Mock Enterprise</option><option value="imported" disabled={!importedAvailable}>Imported Session</option><option value="neo4j">Neo4j Live</option></select>
       {hasSelection && (
         <>
           <div className="mx-1 h-6 w-px bg-border" />

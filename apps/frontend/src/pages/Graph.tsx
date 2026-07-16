@@ -28,13 +28,21 @@ import type { GraphLayout, GraphLink, GraphNode } from '../types/graph'
 import { exportGraph } from '../services/graphExport'
 import { parseGraphQuery } from '../services/navigation'
 import type { NodeType, RiskLevel, SourceSystem } from '../types/graph'
+import { useGraphSource } from '../hooks/useGraphSource'
+import type { GraphSourceMode } from '../types/neo4j'
+import { getNode as getNeo4jNode, searchNodes as searchNeo4jNodes } from '../services/neo4jGraphApi'
+import { adaptNeo4jNode } from '../services/neo4jGraphAdapter'
+import { Neo4jStatusBadge } from '../components/Neo4jStatusBadge'
+import { loadSettings } from '../services/navigation'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const importedId = searchParams.get('importId')
-  const [source, setSource] = useState<'mock' | 'imported'>(importedId ? 'imported' : 'mock')
-  const { data, loading, error } = useGraphData(source === 'imported' ? importedId : null)
+  const { source, setSource } = useGraphSource(importedId ? 'imported' : searchParams.get('source'))
+  const backendFilters = { nodeType: searchParams.get('nodeType') ?? undefined, sourceSystem: searchParams.get('sourceSystem') ?? undefined, risk: searchParams.get('risk') ?? undefined, status: searchParams.get('status') ?? undefined }
+  const [remoteFilters, setRemoteFilters] = useState<Record<string, unknown>>(backendFilters)
+  const { data, loading, error, retry, partial, expanding, expandRemote } = useGraphData(source === 'imported' ? importedId : null, source, remoteFilters)
   const links = data?.links ?? []
   const {
     selectedNode,
@@ -72,11 +80,18 @@ export function GraphPage() {
   const [frozen, setFrozen] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [investigationOpen, setInvestigationOpen] = useState(true)
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const graphContainerRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<GraphCanvasHandle>(null)
+  const filterSystems = (values: any[]) => { setSystemFilter(values); if(source==='neo4j')setRemoteFilters((current)=>({...current,sourceSystem:values[0]})) }
+  const filterNodeTypes = (values: any[]) => { setNodeTypeFilter(values); if(source==='neo4j')setRemoteFilters((current)=>({...current,nodeType:values[0]})) }
+  const filterRisks = (values: any[]) => { setRiskLevelFilter(values); if(source==='neo4j')setRemoteFilters((current)=>({...current,risk:values[0]})) }
+  const filterStatuses = (values: string[]) => { setStatusFilter(values); if(source==='neo4j')setRemoteFilters((current)=>({...current,status:values[0]})) }
+  const clearGraphFilters = () => { resetFilters(); if(source==='neo4j')setRemoteFilters({}) }
 
   useEffect(() => {
     const query = parseGraphQuery(searchParams)
+    setRemoteFilters({ nodeType: query.nodeType, sourceSystem: query.sourceSystem, risk: query.risk, status: query.status })
     setNodeTypeFilter(query.nodeType ? [query.nodeType as NodeType] : [])
     setSystemFilter(query.sourceSystem ? [query.sourceSystem as SourceSystem] : [])
     setRiskLevelFilter(query.risk ? [query.risk as RiskLevel] : [])
@@ -86,9 +101,9 @@ export function GraphPage() {
 
   useEffect(() => {
     const nodeId = searchParams.get('nodeId'); if (!nodeId || !data) return
-    const node = data.nodes.find((candidate) => candidate.id === nodeId); if (!node) return
-    selectNode(node); window.setTimeout(() => fgRef.current?.center(node), 120)
-  }, [data, searchParams, selectNode])
+    const node = data.nodes.find((candidate) => candidate.id === nodeId); if (node) { selectNode(node); window.setTimeout(() => fgRef.current?.center(node), 120); return }
+    if (source === 'neo4j') void getNeo4jNode(nodeId).then((raw) => { const remoteNode = adaptNeo4jNode(raw); selectNode(remoteNode); return expandRemote(nodeId, 'both', 1) }).catch(() => undefined)
+  }, [data, searchParams, selectNode, source, expandRemote])
 
   const handleZoomIn = useCallback(() => {
     fgRef.current?.zoomIn()
@@ -125,15 +140,16 @@ export function GraphPage() {
   const handleNodeClick = useCallback(
     (node: any) => {
       selectNode(node)
+      if (source === 'neo4j') void getNeo4jNode(node.id).then((full) => selectNode(adaptNeo4jNode(full))).catch(() => undefined)
     },
-    [selectNode],
+    [selectNode, source],
   )
 
   const handleBackgroundClick = useCallback(() => {
     clearSelection()
   }, [clearSelection])
 
-  const handleSourceChange = (next: 'mock' | 'imported') => {
+  const handleSourceChange = (next: GraphSourceMode) => {
     if (next === 'imported' && !importedId) return
     setSource(next); clearSelection()
   }
@@ -144,7 +160,7 @@ export function GraphPage() {
     if (action === 'details') selectNode(node)
     if (action === 'profile') navigate(`/identities/${node.id}`)
     if (action === 'center') fgRef.current?.center(node)
-    if (action === 'expand') expand(node.id, direction, depth)
+    if (action === 'expand') { if (source === 'neo4j') void expandRemote(node.id, direction, Math.min(depth, 3)); else expand(node.id, direction, depth) }
     if (action === 'collapse') collapse(node.id)
     if (action === 'hide') { hide(node.id); if (selectedNode?.id === node.id) clearSelection() }
     if (action === 'pin') pinNode(node)
@@ -166,6 +182,8 @@ export function GraphPage() {
     return () => window.removeEventListener('keydown', handler)
   }, [clearSelection, investigation.back, investigation.forward])
 
+  useEffect(() => { if (source !== 'neo4j' || !error || typeof localStorage === 'undefined') return; if (loadSettings(localStorage).autoFallback) { setFallbackNotice(`Neo4j Live unavailable: ${error}. Switched to Mock Enterprise.`); setSource('mock') } }, [source, error, setSource])
+
   if (loading) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3">
@@ -178,7 +196,7 @@ export function GraphPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="p-6 text-center">
-          <p className="text-danger">Failed to load graph data</p><p className="mt-2 text-xs text-gray-500">{error}</p>
+          <p className="text-danger">Failed to load graph data</p><p className="mt-2 text-xs text-gray-500">{error}</p><div className="mt-4 flex justify-center gap-2"><button onClick={()=>void retry()} className="rounded bg-primary px-3 py-1.5 text-xs">Retry</button>{source==='neo4j'&&<button onClick={()=>setSource('mock')} className="rounded border border-border px-3 py-1.5 text-xs">Use Mock Enterprise</button>}</div>
         </Card>
       </div>
     )
@@ -188,7 +206,7 @@ export function GraphPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="p-6 text-center">
-          <p className="text-gray-400">No graph data matches the current workspace.</p><button onClick={resetFilters} className="mt-3 rounded bg-primary px-3 py-1.5 text-xs">Clear filters</button>
+          <p className="text-gray-400">{source==='neo4j'?'Neo4j Live returned no graph objects.':'No graph data matches the current workspace.'}</p><div className="mt-3 flex justify-center gap-2"><button onClick={clearGraphFilters} className="rounded bg-primary px-3 py-1.5 text-xs">Clear filters</button>{source==='neo4j'&&<button onClick={()=>void retry()} className="rounded border border-border px-3 py-1.5 text-xs">Retry</button>}</div>
         </Card>
       </div>
     )
@@ -200,12 +218,14 @@ export function GraphPage() {
       animate={{ opacity: 1 }}
       className={`${fullscreen ? 'fixed inset-0 z-50' : 'absolute inset-0'} flex`}
     >
+      {fallbackNotice&&<div className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">{fallbackNotice}</div>}
       {filtersOpen && (
         <motion.aside initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute inset-y-0 left-0 z-30 w-72 overflow-y-auto border-r border-border bg-surface/95 p-4 backdrop-blur md:sticky md:w-64">
-          <GraphSearch data={filteredData} onSelect={handleSearchSelect} />
+          <GraphSearch data={filteredData} onSelect={handleSearchSelect} remoteSearch={source==='neo4j'?async(query,signal)=>(await searchNeo4jNodes(query,{...backendFilters,limit:20},{signal})).map(adaptNeo4jNode):undefined} />
           <div className="mt-4 space-y-2 rounded-lg border border-border bg-card/40 p-3">
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-500">Graph source</label>
-            <select value={source} onChange={(event) => handleSourceChange(event.target.value as 'mock' | 'imported')} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="mock">Mock graph</option><option value="imported" disabled={!importedId}>Imported graph</option></select>
+            <select value={source} onChange={(event) => handleSourceChange(event.target.value as GraphSourceMode)} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="mock">Mock Enterprise</option><option value="imported" disabled={!importedId}>Imported Session</option><option value="neo4j">Neo4j Live</option></select>
+            {source==='neo4j'&&<Neo4jStatusBadge details/>}
             <div className="flex items-center justify-between text-[10px] text-gray-500"><span>Active source</span><b className="rounded bg-primary/15 px-1.5 py-0.5 uppercase text-primary">{source}</b></div>
             <label className="block pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Layout</label>
             <select value={layout} onChange={(event) => handleLayoutChange(event.target.value as GraphLayout)} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="force">Force</option><option value="hierarchy">Hierarchy</option><option value="radial">Radial</option><option value="concentric">Concentric</option></select>
@@ -219,14 +239,14 @@ export function GraphPage() {
               allRiskLevels={allRiskLevels}
               allStatuses={allStatuses}
               allAccessTypes={allAccessTypes}
-              onSystemFilter={setSystemFilter}
-              onNodeTypeFilter={setNodeTypeFilter}
+              onSystemFilter={filterSystems}
+              onNodeTypeFilter={filterNodeTypes}
               onRelationshipTypeFilter={setRelationshipTypeFilter}
-              onRiskLevelFilter={setRiskLevelFilter}
-              onStatusFilter={setStatusFilter}
+              onRiskLevelFilter={filterRisks}
+              onStatusFilter={filterStatuses}
               onAccessFilter={setAccessFilter}
               onPreset={applyPreset}
-              onReset={resetFilters}
+              onReset={clearGraphFilters}
             />
           </div>
           <div className="mt-6">
@@ -249,6 +269,8 @@ export function GraphPage() {
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             </button>
             <GraphStats data={filteredData} selectedNode={selectedNode} />
+            {source==='neo4j'&&expanding.size>0&&<span className="text-[10px] text-primary">Expanding {expanding.size} node{expanding.size===1?'':'s'}…</span>}
+            {source==='neo4j'&&partial&&<span className="rounded bg-warning/10 px-2 py-1 text-[10px] text-warning">Partial result · limit reached</span>}
           </div>
           <GraphToolbar
             onZoomIn={handleZoomIn}
@@ -287,7 +309,7 @@ export function GraphPage() {
             onBackgroundClick={handleBackgroundClick}
             onContextAction={handleContextAction}
             onLinkClick={(link) => setSelectedLink(link)}
-            onNodeDoubleClick={(node) => expand(node.id, 'both', 1)}
+            onNodeDoubleClick={(node) => { if(source==='neo4j')void expandRemote(node.id,'both',1);else expand(node.id,'both',1) }}
             selectedLinkId={selectedLink?.id}
             shortestPathNodeIds={investigation.path?.nodeIds}
             shortestPathLinkIds={investigation.path?.linkIds}
@@ -313,7 +335,7 @@ export function GraphPage() {
         onPin={pinNode}
         onDependencies={showDependencies}
       />
-      <GraphCommandPalette data={data} onSelect={handleSearchSelect} onFit={handleFitToScreen} onFullscreen={handleToggleFullscreen} onClearFilters={resetFilters} />
+      <GraphCommandPalette data={data} onSelect={handleSearchSelect} onFit={handleFitToScreen} onFullscreen={handleToggleFullscreen} onClearFilters={clearGraphFilters} />
       <RelationshipDrawer link={selectedLink} data={data} onClose={() => setSelectedLink(null)} />
     </motion.div>
   )
