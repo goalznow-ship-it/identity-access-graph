@@ -1,6 +1,6 @@
 import type { GraphNode, NodeType, RiskLevel, SourceSystem } from '../types/graph'
 
-export const APP_ROUTES = ['/', '/graph', '/pipeline', '/linux-admin', '/business-questions', '/imports', '/identities', '/groups', '/access', '/settings', '/risk'] as const
+export const APP_ROUTES = ['/', '/graph', '/pipeline', '/linux-admin', '/business-questions', '/imports', '/identities', '/groups', '/access', '/settings', '/risk', '/attack-paths'] as const
 export const KPI_ROUTES: Record<string, string> = { 'Total Identities':'/identities','Active Accounts':'/identities?status=ACTIVE','Disabled Accounts':'/identities?status=DISABLED','Privileged Accounts':'/identities?privileged=true','Applications':'/graph?nodeType=APPLICATION','Hosts':'/graph?nodeType=HOST','Databases':'/graph?nodeType=DATABASE','Business Services':'/graph?nodeType=BUSINESS_SERVICE','Critical Risks':'/graph?risk=CRITICAL','Open Findings':'/risk' }
 export const QUICK_ACTION_ROUTES: Record<string, string> = { 'Import Data':'/imports','Open Graph':'/graph','Business Questions':'/business-questions','Identity Search':'/identities','Run Correlation':'/imports?step=correlation','Investigate':'/graph?mode=investigation','Open Pipeline':'/pipeline' }
 export function isKnownRoute(pathname: string) { return APP_ROUTES.some((route) => route === pathname) || /^\/identities\/[^/]+$/.test(pathname) }

@@ -1,1 +1,1 @@
-export*from'./risk.module';export*from'./risk.service';export*from'./risk.types';export*from'./risk-scoring.service';export*from'./finding.repository';export*from'./rules'
+export*from'./risk.module';export*from'./risk.service';export*from'./risk.types';export*from'./risk-scoring.service';export*from'./risk-graph-source.service';export*from'./finding.repository';export*from'./rules'

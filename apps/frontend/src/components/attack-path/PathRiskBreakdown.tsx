@@ -1,0 +1,1 @@
+import type{AttackPath}from'../../types/attackPath';export function PathRiskBreakdown({path}:{path:AttackPath}){return <div className="space-y-1">{path.factorScores.map(f=><div key={f.factor}className="flex items-center justify-between rounded bg-surface p-2 text-xs"><span title={f.reason}>{f.reason}</span><b>+{f.score}</b></div>)}</div>}

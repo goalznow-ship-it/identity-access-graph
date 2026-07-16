@@ -7,7 +7,7 @@ import { GraphHoverTooltip } from './GraphHoverTooltip'
 import { disconnectedComponentPositions, nodeCollisionRadius } from '../../services/graphPresentation'
 
 export interface GraphCanvasHandle { zoomIn: () => void; zoomOut: () => void; fit: () => void; reset: () => void; center: (node: GraphNode) => void; centerAt: (x:number,y:number) => void; freeze: (value: boolean) => void; setLayout: (layout: GraphLayout) => void; exportPng: () => void }
-export type GraphContextAction = 'details' | 'profile' | 'center' | 'expand' | 'collapse' | 'hide' | 'pin' | 'dependencies'
+export type GraphContextAction = 'details' | 'profile' | 'center' | 'expand' | 'collapse' | 'hide' | 'pin' | 'dependencies' | 'paths-from' | 'paths-to' | 'privileged-reachability' | 'attack-workspace'
 
 interface GraphCanvasProps {
   data: GraphData
@@ -117,7 +117,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     <GraphHoverTooltip node={hoveredNode} position={pointer} degree={degree} />
     {menu && <div className="absolute z-50 w-52 rounded border border-border bg-surface p-1 text-xs shadow-xl" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
       <div className="border-b border-border px-2 py-1 font-medium text-gray-200">{menu.node.displayName}</div>
-      {([['details','Open details'],['profile','Open 360 profile'],['center','Center'],['collapse','Collapse'],['hide','Hide'],['pin','Pin'],['dependencies','Show dependencies']] as [GraphContextAction,string][]).map(([value,label]) => <button key={value} className="block w-full rounded px-2 py-1.5 text-left text-gray-300 hover:bg-white/5" onClick={() => action(value)}>{label}</button>)}
+      {([['details','Open details'],['profile','Open 360 profile'],['center','Center'],['collapse','Collapse'],['hide','Hide'],['pin','Pin'],['dependencies','Show dependencies'],['paths-from','Find paths from this node'],['paths-to','Find paths to this node'],['privileged-reachability','Show privileged reachability'],['attack-workspace','Open Attack Path workspace']] as [GraphContextAction,string][]).map(([value,label]) => <button key={value} className="block w-full rounded px-2 py-1.5 text-left text-gray-300 hover:bg-white/5" onClick={() => action(value)}>{label}</button>)}
       <div className="mt-1 border-t border-border p-1"><div className="mb-1 text-gray-500">Expand neighbors</div><div className="flex gap-1"><select value={direction} onChange={(event) => setDirection(event.target.value as typeof direction)} className="min-w-0 flex-1 bg-card"><option value="both">Both</option><option value="incoming">Incoming</option><option value="outgoing">Outgoing</option></select><select value={depth} onChange={(event) => setDepth(Number(event.target.value))} className="bg-card">{[1,2,3,4,5].map((value) => <option key={value}>{value}</option>)}</select><button className="rounded bg-primary px-2" onClick={() => action('expand')}>Go</button></div></div>
     </div>}
   </div>

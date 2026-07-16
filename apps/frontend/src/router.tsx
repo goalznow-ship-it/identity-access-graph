@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import App from './App'
-import { Home, PipelinePage, GraphPage, UserProfilePage, LinuxAdminPage, BusinessQuestionsPage, ImportsPage, IdentitiesPage, GroupsPage, AccessPage, SettingsPage, NotFoundPage, RiskFindingsPage } from './pages'
+import { Home, PipelinePage, GraphPage, UserProfilePage, LinuxAdminPage, BusinessQuestionsPage, ImportsPage, IdentitiesPage, GroupsPage, AccessPage, SettingsPage, NotFoundPage, RiskFindingsPage, AttackPathsPage } from './pages'
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +32,7 @@ export const router = createBrowserRouter([
       { path: '/access/roles', element: <AccessPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/risk', element: <RiskFindingsPage /> },
+      { path: '/attack-paths', element: <AttackPathsPage /> },
       {
         path: '/linux-admin',
         element: <LinuxAdminPage />,

@@ -37,6 +37,8 @@ import { adaptNeo4jNode } from '../services/neo4jGraphAdapter'
 import { Neo4jStatusBadge } from '../components/Neo4jStatusBadge'
 import { loadSettings } from '../services/navigation'
 import { clusterGraph, filterGraphView, loadLayout, saveLayout, type GraphClusterMode, type GraphViewMode, type SavedGraphView } from '../services/graphPresentation'
+import { getAttackPath } from '../services/attackPathApi'
+import type { AttackPath } from '../types/attackPath'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
@@ -75,7 +77,8 @@ export function GraphPage() {
   } = useGraphFilters(data)
   const [viewMode,setViewMode]=useState<GraphViewMode>('overview')
   const [clusterMode,setClusterMode]=useState<GraphClusterMode>('none')
-  const presentedData=useMemo(()=>clusterGraph(filterGraphView(filteredData,viewMode),clusterMode),[filteredData,viewMode,clusterMode])
+  const [externalPath,setExternalPath]=useState<AttackPath|null>(null)
+  const presentedData=useMemo(()=>externalPath?{nodes:externalPath.nodes,links:externalPath.relationships}:clusterGraph(filterGraphView(filteredData,viewMode),clusterMode),[filteredData,viewMode,clusterMode,externalPath])
   const { visibleData, visibleIds, expand, collapse, hide } = useGraphExpansion(presentedData)
   const investigation = useGraphInvestigation(visibleData)
 
@@ -110,6 +113,7 @@ export function GraphPage() {
     const node = data.nodes.find((candidate) => candidate.id === nodeId); if (node) { selectNode(node); window.setTimeout(() => fgRef.current?.center(node), 120); return }
     if (source === 'neo4j') void getNeo4jNode(nodeId).then((raw) => { const remoteNode = adaptNeo4jNode(raw); selectNode(remoteNode); return expandRemote(nodeId, 'both', 1) }).catch(() => undefined)
   }, [data, searchParams, selectNode, source, expandRemote])
+  useEffect(()=>{const pathId=searchParams.get('pathId');if(!pathId){setExternalPath(null);return}void getAttackPath(pathId).then(path=>{setExternalPath(path);setInvestigationOpen(true);window.setTimeout(()=>fgRef.current?.fit(),100)}).catch(()=>setFallbackNotice('Attack path could not be loaded.'))},[searchParams])
 
   const handleZoomIn = useCallback(() => {
     fgRef.current?.zoomIn()
@@ -172,6 +176,8 @@ export function GraphPage() {
     if (action === 'hide') { hide(node.id); if (selectedNode?.id === node.id) clearSelection() }
     if (action === 'pin') pinNode(node)
     if (action === 'dependencies') showDependencies(node)
+    if (action === 'paths-from'||action==='privileged-reachability'||action==='attack-workspace') navigate(`/attack-paths?sourceNodeId=${encodeURIComponent(node.id)}`)
+    if (action === 'paths-to') navigate(`/attack-paths?targetNodeId=${encodeURIComponent(node.id)}`)
   }
 
   useEffect(() => {
@@ -321,8 +327,8 @@ export function GraphPage() {
             selectedLinkId={selectedLink?.id}
             shortestPathNodeIds={investigation.path?.nodeIds}
             shortestPathLinkIds={investigation.path?.linkIds}
-            attackPathNodeIds={investigation.attack?.nodeIds}
-            attackPathLinkIds={investigation.attack?.linkIds}
+            attackPathNodeIds={externalPath?.nodes.map(node=>node.id)??investigation.attack?.nodeIds}
+            attackPathLinkIds={externalPath?.relationships.map(link=>link.id)??investigation.attack?.linkIds}
             onZoomChange={setZoom}
           />
           <GraphMiniMap data={investigation.focusedData} selected={selectedNode} onNavigate={(x,y)=>fgRef.current?.centerAt(x,y)} />
@@ -333,6 +339,7 @@ export function GraphPage() {
       {investigationOpen && <motion.aside id="graph-investigation" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute inset-y-0 right-0 z-30 w-[min(22rem,100vw)] overflow-y-auto border-l border-border bg-surface/95 p-4 shadow-2xl backdrop-blur xl:static xl:w-72 xl:shadow-none">
         <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Investigation</p><button className="text-gray-500 hover:text-white xl:hidden" onClick={() => setInvestigationOpen(false)}>×</button></div>
         <GraphInvestigationPanel data={visibleData} path={investigation.path} blast={investigation.blast} attack={investigation.attack} onShortest={investigation.runShortestPath} onBlast={investigation.runBlastRadius} onAttack={investigation.runAttackPath} onFocus={investigation.focusNode} onRestore={investigation.restore} onBack={investigation.back} onForward={investigation.forward} canBack={investigation.canBack} canForward={investigation.canForward} />
+        {externalPath&&<div className="mt-4 rounded border border-warning/30 bg-warning/5 p-3"><div className="text-xs font-semibold text-warning">Loaded attack path · {externalPath.totalRiskScore}/100</div><p className="mt-2 text-xs leading-5 text-gray-400">{externalPath.explanation}</p></div>}
         <div className="mt-4 border-t border-border pt-3"><p className="mb-2 text-xs font-semibold uppercase text-gray-400">Graph history</p><GraphHistory entries={investigation.history} index={investigation.historyIndex} /></div>
       </motion.aside>}
 
