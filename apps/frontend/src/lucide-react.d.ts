@@ -1,0 +1,56 @@
+declare module 'lucide-react' {
+  import { FC, SVGProps } from 'react'
+  export type LucideIcon = FC<SVGProps<SVGSVGElement>>
+  export const LayoutDashboard: LucideIcon
+  export const Share2: LucideIcon
+  export const Users: LucideIcon
+  export const Shield: LucideIcon
+  export const Settings: LucideIcon
+  export const Search: LucideIcon
+  export const Bell: LucideIcon
+  export const Sun: LucideIcon
+  export const Moon: LucideIcon
+  export const ChevronLeft: LucideIcon
+  export const ChevronRight: LucideIcon
+  export const ChevronDown: LucideIcon
+  export const ChevronUp: LucideIcon
+  export const User: LucideIcon
+  export const LogOut: LucideIcon
+  export const Menu: LucideIcon
+  export const X: LucideIcon
+  export const Plus: LucideIcon
+  export const Minus: LucideIcon
+  export const Edit3: LucideIcon
+  export const Trash2: LucideIcon
+  export const Copy: LucideIcon
+  export const Check: LucideIcon
+  export const AlertTriangle: LucideIcon
+  export const Info: LucideIcon
+  export const Loader2: LucideIcon
+  export const GitBranch: LucideIcon
+  export const ExternalLink: LucideIcon
+  export const ArrowLeft: LucideIcon
+  export const Search: LucideIcon
+  export const Skull: LucideIcon
+  export const Terminal: LucideIcon
+  export const Server: LucideIcon
+  export const Key: LucideIcon
+  export const Activity: LucideIcon
+  export const HelpCircle: LucideIcon
+  export const Wallet: LucideIcon
+  export const Bot: LucideIcon
+  export const UserX: LucideIcon
+  export const GitMerge: LucideIcon
+  export const Building2: LucideIcon
+  export const AppWindow: LucideIcon
+  export const BarChart3: LucideIcon
+  export const Monitor: LucideIcon
+  export const Upload: LucideIcon
+  export const UploadCloud: LucideIcon
+  export const FileText: LucideIcon
+  export const RefreshCw: LucideIcon
+  export const Download: LucideIcon
+  export const AlertCircle: LucideIcon
+  export const CheckCircle: LucideIcon
+  export const XCircle: LucideIcon
+}

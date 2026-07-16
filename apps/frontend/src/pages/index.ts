@@ -1,1 +1,7 @@
 export { Home } from './Home'
+export { PipelinePage } from './Pipeline'
+export { GraphPage } from './Graph'
+export { UserProfilePage } from './UserProfile'
+export { LinuxAdminPage } from './LinuxAdmin'
+export { BusinessQuestionsPage } from './BusinessQuestions'
+export { ImportsPage } from './Imports'

@@ -5,6 +5,10 @@ import {
   Users,
   Shield,
   Settings,
+  GitBranch,
+  Terminal,
+  HelpCircle,
+  Upload,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -31,6 +35,10 @@ const menuGroups: MenuGroup[] = [
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
       { label: 'Graph', icon: Share2, path: '/graph' },
+      { label: 'Pipeline', icon: GitBranch, path: '/pipeline' },
+      { label: 'Linux Admin', icon: Terminal, path: '/linux-admin' },
+      { label: 'Business Questions', icon: HelpCircle, path: '/business-questions' },
+      { label: 'Imports', icon: Upload, path: '/imports' },
     ],
   },
   {
