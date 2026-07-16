@@ -16,12 +16,15 @@ interface GraphCanvasProps {
   onContextAction?: (action: GraphContextAction, node: GraphNode, direction?: 'both' | 'incoming' | 'outgoing', depth?: number) => void
   attackPathNodeIds?: string[]
   attackPathLinkIds?: string[]
+  onLinkClick?: (link: GraphLink) => void
 }
 
 const LABELED = new Set(['MEMBER_OF', 'HAS_ROLE', 'HAS_ACCESS_TO', 'REPORTS_TO', 'BELONGS_TO', 'RUNS_ON', 'SUPPORTS', 'USES'])
 
-export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas({ data, selectedNode, highlightMode, dependencyInfo, onNodeClick, onBackgroundClick, onContextAction, attackPathNodeIds = [], attackPathLinkIds = [] }, ref) {
+export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas({ data, selectedNode, highlightMode, dependencyInfo, onNodeClick, onBackgroundClick, onContextAction, attackPathNodeIds = [], attackPathLinkIds = [], onLinkClick }, ref) {
   const fgRef = useRef<any>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState({ width: 800, height: 600 })
   const [menu, setMenu] = useState<{ node: GraphNode; x: number; y: number } | null>(null)
   const [direction, setDirection] = useState<'both' | 'incoming' | 'outgoing'>('both')
   const [depth, setDepth] = useState(1)
@@ -83,10 +86,11 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   }, [dense])
 
   useEffect(() => { fgRef.current?.d3ReheatSimulation() }, [data])
+  useEffect(() => { const host = hostRef.current; if (!host) return; const observer = new ResizeObserver(([entry]) => setSize({ width: Math.max(320, entry.contentRect.width), height: Math.max(320, entry.contentRect.height) })); observer.observe(host); return () => observer.disconnect() }, [])
   const action = (value: GraphContextAction) => { if (!menu) return; if (value === 'center') fgRef.current && ref && fgRef.current.centerAt(menu.node.x ?? 0, menu.node.y ?? 0, 350); onContextAction?.(value, menu.node, direction, depth); setMenu(null) }
 
-  return <div className="graph-canvas-host relative h-full w-full" onClick={() => setMenu(null)}>
-    <ForceGraph2D ref={fgRef} graphData={data} nodeCanvasObject={nodeCanvasObject} linkColor={linkColor} linkWidth={0.7} linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1} linkCanvasObjectMode={() => 'after'} linkCanvasObject={drawLinkLabel} onNodeClick={(node: any) => onNodeClick(node as GraphNode)} onNodeRightClick={(node: any, event: MouseEvent) => { event.preventDefault(); setMenu({ node: node as GraphNode, x: event.offsetX, y: event.offsetY }) }} onBackgroundClick={onBackgroundClick} cooldownTicks={100} d3AlphaDecay={0.02} d3VelocityDecay={0.3} enableNodeDrag width={800} height={600} minZoom={0.1} maxZoom={10} />
+  return <div ref={hostRef} className="graph-canvas-host relative h-full w-full" onClick={() => setMenu(null)}>
+    <ForceGraph2D ref={fgRef} graphData={data} nodeCanvasObject={nodeCanvasObject} linkColor={linkColor} linkWidth={0.7} linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1} linkCanvasObjectMode={() => 'after'} linkCanvasObject={drawLinkLabel} onNodeClick={(node: any) => onNodeClick(node as GraphNode)} onLinkClick={(link: any) => onLinkClick?.(link as GraphLink)} onNodeRightClick={(node: any, event: MouseEvent) => { event.preventDefault(); setMenu({ node: node as GraphNode, x: event.offsetX, y: event.offsetY }) }} onBackgroundClick={onBackgroundClick} cooldownTicks={100} d3AlphaDecay={0.02} d3VelocityDecay={0.3} enableNodeDrag width={size.width} height={size.height} minZoom={0.1} maxZoom={10} />
     {menu && <div className="absolute z-50 w-52 rounded border border-border bg-surface p-1 text-xs shadow-xl" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
       <div className="border-b border-border px-2 py-1 font-medium text-gray-200">{menu.node.displayName}</div>
       {([['details','Open details'],['profile','Open 360 profile'],['center','Center'],['collapse','Collapse'],['hide','Hide'],['pin','Pin'],['dependencies','Show dependencies']] as [GraphContextAction,string][]).map(([value,label]) => <button key={value} className="block w-full rounded px-2 py-1.5 text-left text-gray-300 hover:bg-white/5" onClick={() => action(value)}>{label}</button>)}

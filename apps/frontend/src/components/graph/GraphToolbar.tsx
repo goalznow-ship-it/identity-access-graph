@@ -35,7 +35,7 @@ export function GraphToolbar({
   onExport,
 }: GraphToolbarProps) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-border bg-surface/90 p-2 backdrop-blur-glass">
+    <div className="flex max-w-full flex-wrap items-center justify-end gap-2 rounded-xl border border-border bg-surface/90 p-2 backdrop-blur-glass">
       <span className="px-1 text-xs text-gray-500">Source</span>
       <select value={source} onChange={(event) => onSourceChange(event.target.value as 'mock' | 'imported')} className="rounded border border-border bg-card px-2 py-1 text-xs text-gray-200">
         <option value="mock">Mock graph</option>

@@ -21,6 +21,7 @@ export function GraphLegend() {
 
   return (
     <div className="space-y-1.5">
+      <div className="mb-2 grid grid-cols-2 gap-1 border-b border-border pb-2 text-[10px] text-gray-400"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-white"/>Selected</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500"/>Upstream</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-green-500"/>Downstream</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-orange-500"/>Attack path</span></div>
       {Object.entries(NODE_TYPE_COLORS).map(([type, color]) => {
         const label = COLOR_LABELS[color]
         if (!label || seen.has(color)) return null
@@ -32,6 +33,7 @@ export function GraphLegend() {
           </div>
         )
       })}
+      <div className="border-t border-border pt-2 text-[10px] text-gray-500"><span className="mr-2">→ Directed relationship</span><span>Label hidden on dense graphs</span></div>
     </div>
   )
 }

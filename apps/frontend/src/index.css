@@ -23,6 +23,10 @@
   --color-info-muted: rgba(56, 189, 248, 0.15);
 }
 
+@media (max-width: 767px) {
+  .workspace-main { margin-left: 0 !important; }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

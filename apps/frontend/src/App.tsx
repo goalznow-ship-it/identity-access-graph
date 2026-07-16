@@ -14,7 +14,7 @@ export default function App() {
         onToggle={() => setSidebarCollapsed((v) => !v)}
       />
       <main
-        className="flex-1 overflow-auto pt-14 transition-all duration-300 ease-in-out"
+        className="workspace-main flex-1 overflow-auto pt-14 transition-all duration-300 ease-in-out"
         style={{
           marginLeft: sidebarCollapsed ? 72 : 260,
         }}

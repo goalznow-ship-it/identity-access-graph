@@ -95,7 +95,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="fixed left-0 top-14 z-40 flex h-[calc(100vh-3.5rem)] flex-col border-r border-border
+      className="fixed left-0 top-14 z-40 hidden h-[calc(100vh-3.5rem)] flex-col border-r border-border md:flex
         bg-surface transition-all duration-300 ease-in-out"
       style={{ width: collapsed ? 72 : 260 }}
     >

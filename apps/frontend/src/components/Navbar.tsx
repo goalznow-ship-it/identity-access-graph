@@ -3,9 +3,9 @@ import { Search, Bell, Sun, User } from '../components/icons'
 export function Navbar() {
   return (
     <nav className="fixed inset-x-0 top-0 z-50 h-14 border-b border-border bg-background/70 backdrop-blur-xl">
-      <div className="flex h-full items-center justify-between px-6">
+      <div className="flex h-full items-center justify-between px-3 sm:px-6">
         <span className="text-lg font-semibold text-gray-100">
-          Identity Access Graph
+          <span className="hidden sm:inline">Identity Access Graph</span><span className="sm:hidden">IAG</span>
         </span>
 
         <div className="flex items-center gap-4">
