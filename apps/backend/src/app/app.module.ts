@@ -7,6 +7,7 @@ import envConfig from '../config/env.config'
 import { Neo4jModule } from '../neo4j'
 import { RiskModule } from '../risk'
 import { AttackPathModule } from '../attack-path'
+import { ConnectorsModule } from '../connectors'
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AttackPathModule } from '../attack-path'
     ImportsModule,
     RiskModule,
     AttackPathModule,
+    ConnectorsModule,
   ],
 })
 export class AppModule {}

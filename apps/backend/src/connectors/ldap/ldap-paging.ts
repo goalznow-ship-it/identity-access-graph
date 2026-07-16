@@ -1,0 +1,1 @@
+import type{LdapEntry,LdapSearchPage}from'./ldap-client.interface';export function paginateEntries(entries:LdapEntry[],pageSize:number):LdapSearchPage[]{const pages=[];for(let index=0;index<entries.length;index+=pageSize)pages.push({entries:entries.slice(index,index+pageSize),page:pages.length+1,cookie:index+pageSize<entries.length?String(index+pageSize):undefined});return pages}
