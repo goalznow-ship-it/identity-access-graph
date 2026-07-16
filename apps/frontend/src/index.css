@@ -1,0 +1,76 @@
+:root {
+  --color-background: #0f0f1a;
+  --color-surface: #1a1a2e;
+  --color-card: rgba(255, 255, 255, 0.04);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-primary: #4f8cff;
+  --color-primary-hover: #6ba0ff;
+  --color-primary-muted: rgba(79, 140, 255, 0.15);
+  --color-secondary: #6366f1;
+  --color-secondary-hover: #818cf8;
+  --color-secondary-muted: rgba(99, 102, 241, 0.15);
+  --color-accent: #a855f7;
+  --color-accent-hover: #c084fc;
+  --color-accent-muted: rgba(168, 85, 247, 0.15);
+  --color-success: #22c55e;
+  --color-success-muted: rgba(34, 197, 94, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-muted: rgba(245, 158, 11, 0.15);
+  --color-danger: #ef4444;
+  --color-danger-hover: #f87171;
+  --color-danger-muted: rgba(239, 68, 68, 0.15);
+  --color-info: #38bdf8;
+  --color-info-muted: rgba(56, 189, 248, 0.15);
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background font-sans text-gray-100 antialiased;
+  }
+
+  ::selection {
+    @apply bg-primary/30;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
+  }
+
+  ::-webkit-scrollbar {
+    @apply h-1.5 w-1.5;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-white/10;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border bg-card shadow-glass backdrop-blur-glass;
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-0.5;
+  }
+}
