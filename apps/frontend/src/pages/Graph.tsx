@@ -18,6 +18,7 @@ import {
   GraphCommandPalette,
   RelationshipDrawer,
   GraphHistory,
+  GraphStatusBar,
 } from '../components/graph'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
@@ -66,6 +67,9 @@ export function GraphPage() {
   const [fullscreen, setFullscreen] = useState(false)
   const [layout, setLayout] = useState<GraphLayout>('force')
   const [selectedLink, setSelectedLink] = useState<GraphLink | null>(null)
+  const [frozen, setFrozen] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [investigationOpen, setInvestigationOpen] = useState(true)
   const graphContainerRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<GraphCanvasHandle>(null)
 
@@ -84,6 +88,8 @@ export function GraphPage() {
   const handleResetView = useCallback(() => {
     fgRef.current?.reset()
   }, [])
+  const handleFreeze = () => { const next = !frozen; setFrozen(next); fgRef.current?.freeze(next) }
+  const openInvestigation = () => { setInvestigationOpen(true); window.setTimeout(() => document.getElementById('graph-investigation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0) }
 
   const handleToggleFullscreen = useCallback(() => {
     setFullscreen((v) => !v)
@@ -180,6 +186,13 @@ export function GraphPage() {
       {filtersOpen && (
         <motion.aside initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute inset-y-0 left-0 z-30 w-72 overflow-y-auto border-r border-border bg-surface/95 p-4 backdrop-blur md:sticky md:w-64">
           <GraphSearch data={filteredData} onSelect={handleSearchSelect} />
+          <div className="mt-4 space-y-2 rounded-lg border border-border bg-card/40 p-3">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-500">Graph source</label>
+            <select value={source} onChange={(event) => handleSourceChange(event.target.value as 'mock' | 'imported')} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="mock">Mock graph</option><option value="imported" disabled={!importedId}>Imported graph</option></select>
+            <div className="flex items-center justify-between text-[10px] text-gray-500"><span>Active source</span><b className="rounded bg-primary/15 px-1.5 py-0.5 uppercase text-primary">{source}</b></div>
+            <label className="block pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Layout</label>
+            <select value={layout} onChange={(event) => handleLayoutChange(event.target.value as GraphLayout)} className="w-full rounded border border-border bg-surface px-2 py-1.5 text-xs text-gray-200"><option value="force">Force</option><option value="hierarchy">Hierarchy</option><option value="radial">Radial</option><option value="concentric">Concentric</option></select>
+          </div>
           <div className="mt-4">
             <GraphFilters
               filters={filters}
@@ -203,22 +216,7 @@ export function GraphPage() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Legend</p>
             <GraphLegend />
           </div>
-          <GraphInvestigationPanel
-            data={visibleData}
-            path={investigation.path}
-            blast={investigation.blast}
-            attack={investigation.attack}
-            onShortest={investigation.runShortestPath}
-            onBlast={investigation.runBlastRadius}
-            onAttack={investigation.runAttackPath}
-            onFocus={investigation.focusNode}
-            onRestore={investigation.restore}
-            onBack={investigation.back}
-            onForward={investigation.forward}
-            canBack={investigation.canBack}
-            canForward={investigation.canForward}
-          />
-          <div className="mt-4 border-t border-border pt-3"><p className="mb-2 text-xs font-semibold uppercase text-gray-400">Graph history</p><GraphHistory entries={investigation.history} index={investigation.historyIndex} /></div>
+          <div className="mt-4 rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-gray-500">Saved views<br/><span className="text-gray-600">No saved workspace yet</span></div>
           <div className="mt-3 text-[10px] text-gray-600">Ctrl+K commands · F fit · 1–4 layouts · [ / ] history · Esc clear</div>
         </motion.aside>
       )}
@@ -240,7 +238,15 @@ export function GraphPage() {
             onZoomOut={handleZoomOut}
             onFitToScreen={handleFitToScreen}
             onResetView={handleResetView}
+            onCenter={() => selectedNode ? fgRef.current?.center(selectedNode) : fgRef.current?.fit()}
+            onFreeze={handleFreeze}
+            frozen={frozen}
             onToggleFullscreen={handleToggleFullscreen}
+            onSearch={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+            onFilters={() => setFiltersOpen((value) => !value)}
+            onShortestPath={openInvestigation}
+            onBlastRadius={openInvestigation}
+            onAttackPath={openInvestigation}
             highlightMode={highlightMode}
             onHighlightModeChange={setHighlightMode}
             hasSelection={selectedNode !== null}
@@ -264,11 +270,23 @@ export function GraphPage() {
             onBackgroundClick={handleBackgroundClick}
             onContextAction={handleContextAction}
             onLinkClick={(link) => setSelectedLink(link)}
+            onNodeDoubleClick={(node) => expand(node.id, 'both', 1)}
+            selectedLinkId={selectedLink?.id}
+            shortestPathNodeIds={investigation.path?.nodeIds}
+            shortestPathLinkIds={investigation.path?.linkIds}
             attackPathNodeIds={investigation.attack?.nodeIds}
             attackPathLinkIds={investigation.attack?.linkIds}
+            onZoomChange={setZoom}
           />
         </div>
+        <GraphStatusBar nodes={investigation.focusedData.nodes.length} links={investigation.focusedData.links.length} selected={selectedNode} mode={investigation.attack ? 'Attack path' : investigation.path ? 'Shortest path' : investigation.blast ? 'Blast radius' : highlightMode} layout={layout} source={source} zoom={zoom} />
       </div>
+
+      {investigationOpen && <motion.aside id="graph-investigation" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute inset-y-0 right-0 z-30 w-[min(22rem,100vw)] overflow-y-auto border-l border-border bg-surface/95 p-4 shadow-2xl backdrop-blur xl:static xl:w-72 xl:shadow-none">
+        <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Investigation</p><button className="text-gray-500 hover:text-white xl:hidden" onClick={() => setInvestigationOpen(false)}>×</button></div>
+        <GraphInvestigationPanel data={visibleData} path={investigation.path} blast={investigation.blast} attack={investigation.attack} onShortest={investigation.runShortestPath} onBlast={investigation.runBlastRadius} onAttack={investigation.runAttackPath} onFocus={investigation.focusNode} onRestore={investigation.restore} onBack={investigation.back} onForward={investigation.forward} canBack={investigation.canBack} canForward={investigation.canForward} />
+        <div className="mt-4 border-t border-border pt-3"><p className="mb-2 text-xs font-semibold uppercase text-gray-400">Graph history</p><GraphHistory entries={investigation.history} index={investigation.historyIndex} /></div>
+      </motion.aside>}
 
       <NodeDetailsDrawer
         node={selectedNode}
