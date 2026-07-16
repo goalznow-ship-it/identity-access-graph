@@ -1,0 +1,1 @@
+export const GRAPH_INDEXES=['displayName','username','email','hostname','riskLevel','status','nodeType','sourceSystem'].map((property)=>`CREATE INDEX graph_${property.replace(/[A-Z]/g,(letter)=>`_${letter.toLowerCase()}`)} IF NOT EXISTS FOR (n:GraphNode) ON (n.${property})`)

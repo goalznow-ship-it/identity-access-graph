@@ -5,10 +5,13 @@ import { MappingService } from './mapping/mapping.service'
 import { ValidationService } from './validation/validation.service'
 import { IdentityCorrelationService } from './correlation'
 import { GraphConversionService } from './graph-conversion'
+import { GraphModule } from '../graph'
+import { ImportGraphPersistenceService } from './import-graph-persistence.service'
 
 @Module({
+  imports: [GraphModule],
   controllers: [ImportsController],
-  providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService],
-  exports: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService],
+  providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],
+  exports: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],
 })
 export class ImportsModule {}

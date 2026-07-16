@@ -12,6 +12,7 @@ import type { ClassifyRequest, ApplyMappingsRequest, ValidateRequest } from './t
 import { IdentityCorrelationService, type CorrelationOptions, type CorrelationRecord } from './correlation'
 import { GraphConversionService } from './graph-conversion'
 import { deterministicId } from './graph-conversion/deterministic-id'
+import { ImportGraphPersistenceService } from './import-graph-persistence.service'
 
 @ApiTags('Imports')
 @Controller('imports')
@@ -22,6 +23,7 @@ export class ImportsController {
     private readonly validationService: ValidationService,
     private readonly correlationService: IdentityCorrelationService,
     private readonly conversionService: GraphConversionService,
+    private readonly persistenceService: ImportGraphPersistenceService,
   ) {}
 
   @Post('upload')
@@ -314,5 +316,12 @@ export class ImportsController {
     if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
     const { preview: _preview, ...summary } = result
     return summary
+  }
+
+  @Post(':importId/persist')
+  @HttpCode(200)
+  persist(@Param('importId') importId: string) {
+    if (!this.service.getSession(importId)) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
+    return this.persistenceService.persistConvertedGraph(importId)
   }
 }

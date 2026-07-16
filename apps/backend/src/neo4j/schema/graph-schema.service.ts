@@ -1,0 +1,2 @@
+import { Injectable } from '@nestjs/common'; import { Neo4jService } from '../neo4j.service'; import { GRAPH_CONSTRAINTS } from './constraints'; import { GRAPH_INDEXES } from './indexes'
+@Injectable() export class GraphSchemaService{constructor(private readonly neo4j:Neo4jService){}async bootstrap(){if(!this.neo4j.isEnabled())return{status:'disabled',statementsExecuted:0};let statementsExecuted=0;for(const statement of [...GRAPH_CONSTRAINTS,...GRAPH_INDEXES]){await this.neo4j.write(statement);statementsExecuted++}return{status:'ok',statementsExecuted}}}
