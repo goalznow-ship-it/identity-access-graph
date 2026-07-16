@@ -1,0 +1,2 @@
+import type { RiskSummary } from '../../types/risk'
+export function RiskCategoryChart({summary}:{summary:RiskSummary}){return <section className="rounded-xl border border-border bg-card p-4"><h2 className="text-sm font-semibold">Categories</h2><div className="mt-3 flex flex-wrap gap-2">{Object.entries(summary.countsByCategory).map(([key,value])=><span key={key} className="rounded border border-border bg-surface px-2 py-1 text-xs text-gray-400">{key.replace(/_/g,' ')} <b className="text-gray-200">{value}</b></span>)}</div></section>}

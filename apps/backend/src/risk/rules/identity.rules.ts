@@ -1,0 +1,5 @@
+import{FindingCategory as C,FindingSeverity as S,type RiskRule}from'../risk.types';import{isUser,match,p,text}from'./helpers'
+export const identityRules:RiskRule[]=[
+{id:'multiple-source-identity',title:'Identity present in multiple systems',category:C.IDENTITY,defaultSeverity:S.LOW,remediation:'Confirm correlation and designate an authoritative source.',detect:g=>{const groups=new Map<string,any[]>();g.nodes.filter(isUser).forEach(n=>{const key=text(p(n,'canonicalIdentityId')??p(n,'email')??p(n,'employeeId'));if(key)groups.set(key,[...(groups.get(key)??[]),n])});return[...groups.values()].filter(x=>new Set(x.map(n=>n.sourceSystem)).size>1).map(x=>match(x.map(n=>n.id))) }},
+{id:'conflicting-correlated-identity',title:'Conflicting correlated identity',category:C.IDENTITY,defaultSeverity:S.HIGH,remediation:'Manually review strong identifier conflicts before merging.',detect:g=>g.nodes.filter(n=>p(n,'correlationConflict')===true||text(p(n,'correlationConfidence'))==='conflict').map(n=>match([n.id]))},
+]

@@ -1,0 +1,1 @@
+export function RiskScanButton({scanning,onScan}:{scanning:boolean;onScan:()=>void}){return <button disabled={scanning}onClick={onScan}title={scanning?'Risk scan in progress':'Run deterministic risk rules'}className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:cursor-wait disabled:opacity-60">{scanning?'Scanning…':'Run risk scan'}</button>}

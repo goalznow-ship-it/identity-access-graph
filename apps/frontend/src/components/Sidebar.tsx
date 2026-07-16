@@ -34,6 +34,7 @@ const menuGroups: MenuGroup[] = [
     group: 'Main',
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
+      { label: 'Risk Findings', icon: Shield, path: '/risk' },
       { label: 'Graph', icon: Share2, path: '/graph' },
       { label: 'Pipeline', icon: GitBranch, path: '/pipeline' },
       { label: 'Linux Admin', icon: Terminal, path: '/linux-admin' },

@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "test": "tsx --test src/pipeline/__tests__/*.test.ts src/imports/__tests__/*.test.ts src/neo4j/__tests__/*.test.ts",
+    "test": "tsx --test src/pipeline/__tests__/*.test.ts src/imports/__tests__/*.test.ts src/neo4j/__tests__/*.test.ts src/risk/__tests__/*.test.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main"

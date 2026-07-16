@@ -5,6 +5,7 @@ import { PipelineModule } from '../pipeline/pipeline.module'
 import { ImportsModule } from '../imports/imports.module'
 import envConfig from '../config/env.config'
 import { Neo4jModule } from '../neo4j'
+import { RiskModule } from '../risk'
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Neo4jModule } from '../neo4j'
     HealthModule,
     PipelineModule,
     ImportsModule,
+    RiskModule,
   ],
 })
 export class AppModule {}

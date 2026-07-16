@@ -1,0 +1,7 @@
+import{FindingCategory as C,FindingSeverity as S,type RiskRule}from'../risk.types';import{isUser,outgoing,p,privileged,text,match}from'./helpers'
+export const accountRules:RiskRule[]=[
+{id:'disabled-active-access',title:'Disabled user with active access',category:C.ACCOUNT,defaultSeverity:S.HIGH,remediation:'Remove active entitlements or re-enable only after approval.',detect:g=>g.nodes.filter(n=>isUser(n)&&text(p(n,'status'))==='disabled').flatMap(n=>{const r=outgoing(g,n.id,['HAS_ACCESS','HAS_ACCESS_TO','HAS_ROLE','MEMBER_OF','AUTHENTICATES_TO']);return r.length?[match([n.id],r.map(x=>x.id))]:[]})},
+{id:'disabled-privileged-account',title:'Disabled privileged account',category:C.PRIVILEGE,defaultSeverity:S.CRITICAL,remediation:'Remove privileged assignments and rotate associated credentials.',detect:g=>g.nodes.filter(n=>isUser(n)&&text(p(n,'status'))==='disabled'&&privileged(n)).map(n=>match([n.id]))},
+{id:'stale-privileged-account',title:'Stale privileged account',category:C.ACCOUNT,defaultSeverity:S.HIGH,remediation:'Review ownership and disable or recertify the account.',detect:g=>g.nodes.filter(n=>isUser(n)&&privileged(n)&&['stale','dormant'].includes(text(p(n,'status')))).map(n=>match([n.id]))},
+{id:'privileged-without-manager',title:'Privileged account without manager',category:C.IDENTITY,defaultSeverity:S.MEDIUM,remediation:'Assign an accountable manager and complete access review.',detect:g=>g.nodes.filter(n=>isUser(n)&&privileged(n)&&!p(n,'managerId')&&!outgoing(g,n.id,['REPORTS_TO']).length).map(n=>match([n.id]))},
+]
