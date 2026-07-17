@@ -1,4 +1,4 @@
-import { CheckCircle, ExternalLink, ArrowRight, BarChart3 } from 'lucide-react'
+import { CheckCircle, ExternalLink, ChevronRight, BarChart3 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import type { ImportPersistenceSummary } from '../../types/import'
 import type { WorkflowStepId } from './ImportWorkflowStepper'
