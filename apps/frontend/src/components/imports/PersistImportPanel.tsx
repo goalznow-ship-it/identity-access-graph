@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Database, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react'
+import { Server, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { persistImport, runRiskScan } from '../../services/importApi'
 import type { ImportPersistenceSummary } from '../../types/import'
@@ -20,24 +20,39 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
     durationMs: number
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
+  const [runScan, setRunScan] = useState(true)
+  const [switchSource, setSwitchSource] = useState(true)
+  const [keepSession, setKeepSession] = useState(true)
 
   const handlePersist = async () => {
     setPersisting(true)
     setError(null)
     try {
       const result = await persistImport(importId)
-      setSummary(result)
-      onPersisted(result)
+      const completed: ImportPersistenceSummary = { ...result, switchedToNeo4j: switchSource, keptSession: keepSession }
+      setSummary(completed)
 
-      setScanning(true)
-      try {
-        const scan = await runRiskScan('neo4j')
-        setScanResult(scan)
-      } catch {
-        setScanResult(null)
-      } finally {
-        setScanning(false)
+      if (runScan) {
+        setScanning(true)
+        try {
+          const scan = await runRiskScan('neo4j')
+          setScanResult(scan)
+          completed.riskResult = scan
+        } catch {
+          setScanResult(null)
+          completed.riskResult = null
+        } finally {
+          setScanning(false)
+        }
       }
+      if (switchSource) {
+        localStorage.setItem('iag-graph-source', 'neo4j')
+        window.dispatchEvent(new CustomEvent('iag-graph-source-change', { detail: 'neo4j' }))
+      }
+      if (keepSession) localStorage.setItem('lastImportId', importId)
+      else localStorage.removeItem('iag-active-import')
+      onPersisted(completed)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Persistence failed')
     } finally {
@@ -48,7 +63,7 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
   return (
     <div className="space-y-4 rounded-lg border border-border bg-card p-4">
       <div className="flex items-center gap-2">
-        <Database className="h-5 w-5 text-primary" />
+        <Server className="h-5 w-5 text-primary" />
         <h3 className="text-sm font-medium text-gray-200">Persist to Graph Database</h3>
       </div>
 
@@ -116,18 +131,18 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
           )}
         </div>
       ) : (
-        <Button
-          onClick={handlePersist}
-          disabled={persisting}
-          className="inline-flex items-center gap-2"
-        >
-          {persisting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Database className="h-4 w-4" />
-          )}
-          {persisting ? 'Persisting...' : 'Persist to Graph'}
-        </Button>
+        <div className="space-y-3">
+          <div className="space-y-2 text-xs text-gray-300">
+            <label className="flex gap-2"><input type="checkbox" checked={runScan} onChange={(e) => setRunScan(e.target.checked)} /> Run risk scan</label>
+            <label className="flex gap-2"><input type="checkbox" checked={switchSource} onChange={(e) => setSwitchSource(e.target.checked)} /> Switch active source to Neo4j Live</label>
+            <label className="flex gap-2"><input type="checkbox" checked={keepSession} onChange={(e) => setKeepSession(e.target.checked)} /> Keep imported session</label>
+            <label className="flex gap-2 font-medium text-yellow-300"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> I confirm this import may update existing graph records.</label>
+          </div>
+          <Button onClick={handlePersist} disabled={persisting || !confirmed} className="inline-flex items-center gap-2">
+            {persisting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
+            {persisting ? (scanning ? 'Running risk scan...' : 'Persisting...') : 'Persist to Neo4j'}
+          </Button>
+        </div>
       )}
     </div>
   )

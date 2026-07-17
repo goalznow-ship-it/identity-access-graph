@@ -1,4 +1,4 @@
-import { CheckCircle, Circle, Clock, AlertTriangle } from 'lucide-react'
+import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react'
 
 export type WorkflowStepId =
   | 'upload' | 'inspect' | 'map' | 'validate'
@@ -83,9 +83,9 @@ export function ImportWorkflowStepper({
               {isCompleted ? (
                 <CheckCircle className="h-3.5 w-3.5 shrink-0 text-green-400" />
               ) : isCurrent ? (
-                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
               ) : (
-                <Circle className="h-3.5 w-3.5 shrink-0" />
+                <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-current" />
               )}
               <span className="truncate">{i + 1}. {step.label}</span>
               {isBlocked && (

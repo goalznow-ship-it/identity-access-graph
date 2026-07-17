@@ -204,6 +204,17 @@ export interface ImportPersistenceSummary {
   skipped: number
   conflicts: number
   durationMs: number
+  riskResult?: RiskScanResult | null
+  switchedToNeo4j?: boolean
+  keptSession?: boolean
+}
+
+export interface RiskScanResult {
+  rulesRun: number
+  findingsDetected: number
+  totalFindings: number
+  durationMs: number
+  graphSource: string
 }
 
 export interface ConversionResult {

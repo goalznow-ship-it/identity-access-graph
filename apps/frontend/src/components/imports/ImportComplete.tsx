@@ -1,15 +1,24 @@
-import { CheckCircle, ExternalLink, ChevronRight, BarChart3 } from 'lucide-react'
+import { CheckCircle, ExternalLink, Download, BarChart3 } from 'lucide-react'
 import { Button } from '../ui/Button'
-import type { ImportPersistenceSummary } from '../../types/import'
-import type { WorkflowStepId } from './ImportWorkflowStepper'
+import type { ConversionResult, CorrelationResult, ImportPersistenceSummary, ImportSession } from '../../types/import'
 
 interface ImportCompleteProps {
   importId: string
   persistenceSummary?: ImportPersistenceSummary | null
-  onNavigate: (step: WorkflowStepId) => void
+  session: ImportSession
+  correlation?: CorrelationResult | null
+  conversion?: ConversionResult | null
+  onNewImport: () => void
 }
 
-export function ImportComplete({ importId, persistenceSummary, onNavigate }: ImportCompleteProps) {
+export function ImportComplete({ importId, persistenceSummary, session, correlation, conversion, onNewImport }: ImportCompleteProps) {
+  const rows = session.files.reduce((total, file) => total + file.sheets.reduce((sum, sheet) => sum + sheet.rowCount, 0), 0)
+  const warnings = session.files.reduce((total, file) => total + file.sheets.reduce((sum, sheet) => sum + sheet.warnings.length, 0), 0)
+  const downloadReport = () => {
+    const report = { importId, completedAt: new Date().toISOString(), files: session.files.map((file) => ({ name: file.originalName, rows: file.sheets.reduce((sum, sheet) => sum + sheet.rowCount, 0), sheets: file.sheets.length })), rows, warnings, correlation: correlation?.summary, graph: conversion ? { nodes: conversion.nodesCreated, relationships: conversion.relationshipsCreated, unresolvedReferences: conversion.unresolvedReferences.length, conflicts: conversion.conflicts.length } : null, persistence: persistenceSummary }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `import-${importId}-report.json`; anchor.click(); URL.revokeObjectURL(url)
+  }
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-3 py-8 text-center">
@@ -45,13 +54,22 @@ export function ImportComplete({ importId, persistenceSummary, onNavigate }: Imp
         </div>
       )}
 
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-center">
+        <div className="rounded border border-border p-3"><div className="text-lg text-gray-100">{session.files.length}</div><div className="text-xs text-gray-500">Files processed</div></div>
+        <div className="rounded border border-border p-3"><div className="text-lg text-gray-100">{rows.toLocaleString()}</div><div className="text-xs text-gray-500">Rows processed</div></div>
+        <div className="rounded border border-border p-3"><div className="text-lg text-gray-100">{correlation?.summary.identities.toLocaleString() ?? '—'}</div><div className="text-xs text-gray-500">Identities correlated</div></div>
+        <div className="rounded border border-border p-3"><div className="text-lg text-gray-100">{warnings}</div><div className="text-xs text-gray-500">Warnings</div></div>
+      </div>
+
+      {persistenceSummary?.riskResult && <p className="text-sm text-gray-400">Risk scan: {persistenceSummary.riskResult.findingsDetected} new findings from {persistenceSummary.riskResult.rulesRun} rules.</p>}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={() => window.open(`/graph?importId=${importId}`, '_blank')}
           className="inline-flex items-center gap-2"
         >
           <ExternalLink className="h-4 w-4" />
-          Open in Graph Explorer
+          Graph
         </Button>
         <Button
           variant="ghost"
@@ -59,16 +77,12 @@ export function ImportComplete({ importId, persistenceSummary, onNavigate }: Imp
           className="inline-flex items-center gap-2"
         >
           <BarChart3 className="h-4 w-4" />
-          View Risk Findings
+          Risk Findings
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => onNavigate('graphPreview')}
-          className="inline-flex items-center gap-2"
-        >
-          <ArrowRight className="h-4 w-4" />
-          Back to Graph Preview
-        </Button>
+        <Button variant="ghost" onClick={() => window.open('/', '_blank')}>Dashboard</Button>
+        <Button variant="ghost" onClick={() => window.open('/enterprise-identities', '_blank')}>Enterprise Identities</Button>
+        <Button variant="secondary" onClick={downloadReport}><Download className="h-4 w-4" />Download Import Report</Button>
+        <Button variant="danger" onClick={onNewImport}>Start New Import</Button>
       </div>
     </div>
   )

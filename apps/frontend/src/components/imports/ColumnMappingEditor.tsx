@@ -12,6 +12,8 @@ interface ColumnMappingEditorProps {
   requiredFields?: string[]
   onValidate?: () => void
   onApply?: () => void
+  onAutoMap?: () => void
+  onReset?: () => void
 }
 
 export const TARGET_FIELD_CATEGORIES = [
@@ -30,6 +32,8 @@ export function ColumnMappingEditor({
   requiredFields = [],
   onValidate,
   onApply,
+  onAutoMap,
+  onReset,
 }: ColumnMappingEditorProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'mapped' | 'unmapped' | 'required' | 'duplicate'>('all')
@@ -105,11 +109,13 @@ export function ColumnMappingEditor({
         </select>
 
         <div className="flex items-center gap-2 ml-auto">
+          <Button variant="ghost" size="sm" onClick={onAutoMap}>Auto-map</Button>
+          <Button variant="ghost" size="sm" onClick={onReset}>Reset</Button>
           <Button variant="ghost" size="sm" onClick={onValidate} disabled={mappedCount === 0}>
             <AlertTriangle className="h-4 w-4 mr-1" />
             Validate
           </Button>
-          <Button variant="primary" size="sm" onClick={onApply} disabled={mappedCount === 0}>
+          <Button variant="primary" size="sm" onClick={onApply} disabled={mappedCount === 0 || duplicateCount > 0}>
             <CheckCircle className="h-4 w-4 mr-1" />
             Apply Mappings
           </Button>

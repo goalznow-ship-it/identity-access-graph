@@ -34,8 +34,17 @@ const STEP_KEYS: Record<string, WorkflowStepId> = {
   complete: 'complete',
 }
 
-function persistImportId(importId: string) {
-  try { localStorage.setItem(LS_IMPORT_KEY, importId) } catch {}
+function readStoredImport(): { importId: string; step?: WorkflowStepId } | null {
+  try {
+    const value = localStorage.getItem(LS_IMPORT_KEY)
+    if (!value) return null
+    if (!value.startsWith('{')) return { importId: value }
+    return JSON.parse(value)
+  } catch { return null }
+}
+
+function persistImportState(importId: string, step: WorkflowStepId) {
+  try { localStorage.setItem(LS_IMPORT_KEY, JSON.stringify({ importId, step })) } catch {}
 }
 
 function clearStoredImportId() {
@@ -46,9 +55,12 @@ export function ImportsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlStep = searchParams.get('step') as WorkflowStepId | null
   const urlImportId = searchParams.get('importId')
+  const [storedImport] = useState(readStoredImport)
+  const restoreImportId = urlImportId ?? storedImport?.importId ?? null
 
   const [effectiveStep, setEffectiveStep] = useState<WorkflowStepId>(() => {
     if (urlStep && STEP_KEYS[urlStep]) return urlStep
+    if (!urlImportId && storedImport?.step && STEP_KEYS[storedImport.step]) return storedImport.step
     return 'upload'
   })
 
@@ -57,7 +69,7 @@ export function ImportsPage() {
 
   const {
     pendingFiles, session, uploading, error, limits, progress, cancelling, retrying,
-    addFiles, removeFile, clearFiles, upload, classify, cancel, retry, removeSessionFile, setError,
+    addFiles, removeFile, clearFiles, upload, classify, cancel, retry, removeSessionFile, setSession, setError,
   } = useFileImport()
 
   const [selectedFile, setSelectedFile] = useState<ImportFile | null>(null)
@@ -67,6 +79,7 @@ export function ImportsPage() {
   const [normalizedRecords, setNormalizedRecords] = useState<NormalizedRecord[]>([])
   const [loadingSession, setLoadingSession] = useState(false)
   const [sessionError, setSessionError] = useState<string | null>(null)
+  const [validationFilter, setValidationFilter] = useState<'all' | 'info' | 'warning' | 'error' | 'critical'>('all')
 
   const columnMapping = useColumnMapping({
     importId: session?.importId ?? '',
@@ -95,7 +108,7 @@ export function ImportsPage() {
 
   useEffect(() => {
     if (session?.importId) {
-      persistImportId(session.importId)
+      persistImportState(session.importId, effectiveStep)
       if (!urlImportId) {
         setSearchParams((prev) => { prev.set('importId', session.importId); prev.set('step', effectiveStep); return prev }, { replace: true })
       }
@@ -103,13 +116,19 @@ export function ImportsPage() {
   }, [session?.importId])
 
   useEffect(() => {
-    if (!session && urlImportId && !loadingSession) {
+    if (session?.importId) persistImportState(session.importId, effectiveStep)
+  }, [session?.importId, effectiveStep])
+
+  useEffect(() => {
+    if (!session && restoreImportId && !loadingSession) {
       setLoadingSession(true)
       setSessionError(null)
-      getSession(urlImportId)
+      getSession(restoreImportId)
         .then((sess) => {
-          setEffectiveStep((prev) => {
+          setSession(sess)
+          setEffectiveStep(() => {
             if (urlStep && STEP_KEYS[urlStep]) return urlStep
+            if (storedImport?.step && STEP_KEYS[storedImport.step]) return storedImport.step
             if (sess.files.length > 0) {
               const first = sess.files[0]
               setSelectedFile(first)
@@ -120,7 +139,10 @@ export function ImportsPage() {
             }
             return 'inspect'
           })
-          setCompletedSteps((prev) => prev.add('upload'))
+          const restoredStep = urlStep ?? storedImport?.step ?? 'inspect'
+          const order: WorkflowStepId[] = ['upload', 'inspect', 'map', 'validate', 'correlate', 'graphPreview', 'persist', 'complete']
+          setCompletedSteps(new Set(order.slice(0, Math.max(1, order.indexOf(restoredStep)))))
+          setSearchParams({ importId: sess.importId, step: restoredStep }, { replace: true })
         })
         .catch(() => {
           setSessionError('Could not recover previous import session. Please start a new import.')
@@ -140,6 +162,16 @@ export function ImportsPage() {
     const next = getNextStep(effectiveStep)
     if (next) updateStepAndUrl(next)
   }, [effectiveStep, updateStepAndUrl])
+
+  useEffect(() => {
+    if (session?.files.length && effectiveStep === 'upload' && !loadingSession) {
+      const first = session.files[0]
+      setSelectedFile(first)
+      setSelectedSheet(first.sheets[0] ?? null)
+      setSheetIndex(0)
+      updateStepAndUrl('inspect')
+    }
+  }, [session?.importId, effectiveStep, loadingSession, updateStepAndUrl])
 
   const handleFileSelect = useCallback((file: ImportFile, index = 0) => {
     setSelectedFile(file)
@@ -192,6 +224,15 @@ export function ImportsPage() {
       setError(e instanceof Error ? e.message : 'Failed to load preview')
     }
   }, [session, selectedFile, sheetIndex, validation, updateStepAndUrl, setError])
+
+  const downloadValidationReport = useCallback((format: 'json' | 'csv') => {
+    if (!validationResult) return
+    const content = format === 'json'
+      ? JSON.stringify(validationResult, null, 2)
+      : ['severity,code,file,sheet,row,sourceColumn,targetField,message', ...validationResult.issues.map((issue) => [issue.severity, issue.code, issue.file, issue.sheet, issue.row, issue.sourceColumn, issue.targetField, issue.message].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))].join('\n')
+    const url = URL.createObjectURL(new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' }))
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `import-${session?.importId}-validation.${format}`; anchor.click(); URL.revokeObjectURL(url)
+  }, [session?.importId, validationResult])
 
   const handleCorrelation = useCallback(async () => {
     if (!session) return
@@ -444,6 +485,8 @@ export function ImportsPage() {
                 onMappingsChange={columnMapping.setMappings}
                 onValidate={handleValidate}
                 onApply={columnMapping.apply}
+                onAutoMap={columnMapping.autoMap}
+                onReset={columnMapping.reset}
                 requiredFields={columnMapping.mappings.filter((m) => m.required).map((m) => m.sourceColumn)}
               />
 
@@ -469,14 +512,16 @@ export function ImportsPage() {
 
                   <ValidationIssueList
                     issues={validationResult.issues}
-                    onFilterChange={() => undefined}
+                    filter={validationFilter}
+                    onFilterChange={setValidationFilter}
                   />
+                  <div className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => downloadValidationReport('json')}>Export JSON</Button><Button size="sm" variant="ghost" onClick={() => downloadValidationReport('csv')}>Export CSV</Button></div>
                 </>
               )}
 
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => updateStepAndUrl('map')}>Back to Mapping</Button>
-                <Button onClick={handlePreview} disabled={validation.loading}>
+                <Button onClick={handlePreview} disabled={validation.loading || Boolean(validationResult && (validationResult.summary.error > 0 || validationResult.summary.critical > 0))}>
                   {validation.loading ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-1" />
                   ) : (
@@ -589,7 +634,10 @@ export function ImportsPage() {
             <ImportComplete
               importId={session.importId}
               persistenceSummary={persistenceSummary}
-              onNavigate={setEffectiveStep}
+              session={session}
+              correlation={correlation.result}
+              conversion={conversion.result}
+              onNewImport={handleNewImport}
             />
           )}
         </div>

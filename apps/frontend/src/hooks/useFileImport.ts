@@ -193,6 +193,7 @@ export function useFileImport() {
     cancel,
     retry,
     removeSessionFile,
+    setSession,
     setError,
   }
 }

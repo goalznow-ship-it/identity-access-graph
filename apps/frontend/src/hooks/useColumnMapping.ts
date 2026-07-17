@@ -11,6 +11,7 @@ interface UseColumnMappingOptions {
 
 export function useColumnMapping({ importId, fileId, sheetIndex, session }: UseColumnMappingOptions) {
   const [mappings, setMappings] = useState<ColumnMapping[]>([])
+  const [suggestedMappings, setSuggestedMappings] = useState<ColumnMapping[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,6 +24,7 @@ export function useColumnMapping({ importId, fileId, sheetIndex, session }: UseC
       const sheetResult = results[0]
       if (sheetResult) {
         setMappings(sheetResult.mappings)
+        setSuggestedMappings(sheetResult.mappings)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load mappings')
@@ -49,6 +51,11 @@ export function useColumnMapping({ importId, fileId, sheetIndex, session }: UseC
 
   const apply = useCallback(async () => {
     if (!session) return
+    if (mappings.some((mapping) => mapping.duplicateTarget)) {
+      const error = new Error('Resolve duplicate target fields before applying mappings.')
+      setError(error.message)
+      throw error
+    }
     setLoading(true)
     setError(null)
     try {
@@ -76,6 +83,8 @@ export function useColumnMapping({ importId, fileId, sheetIndex, session }: UseC
     updateMapping,
     ignoreMapping,
     apply,
+    reset: () => setMappings(suggestedMappings),
+    autoMap: () => setMappings(suggestedMappings),
     setMappings,
   }
 }

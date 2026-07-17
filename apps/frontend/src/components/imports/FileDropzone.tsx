@@ -56,7 +56,7 @@ export function FileDropzone({ onFilesSelected, disabled, maxFileSizeMb, preview
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xls,.csv"
+        accept=".xlsx,.xls,.csv,.json,.ndjson"
         multiple
         onChange={handleChange}
         className="hidden"
@@ -66,7 +66,7 @@ export function FileDropzone({ onFilesSelected, disabled, maxFileSizeMb, preview
         {dragging ? 'Drop files here' : 'Drag & drop files or click to browse'}
       </p>
       <p className="mt-1 text-xs text-gray-500">
-        .xlsx, .xls, .csv, .json, .jsonl &mdash; up to {maxFileSizeMb ?? 250}MB per file
+        .xlsx, .xls, .csv, .json, .ndjson &mdash; up to {maxFileSizeMb ?? 250}MB per file
         {previewRows ? ` &middot; ${previewRows} preview rows` : ''}
       </p>
     </div>
