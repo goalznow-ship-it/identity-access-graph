@@ -1,10 +1,11 @@
 export type ConnectorStatus='DISABLED'|'CONFIGURED'|'TESTING'|'CONNECTED'|'DEGRADED'|'FAILED'|'SYNCING'
-export type ConnectorTypeName='ACTIVE_DIRECTORY'|'GENERIC_LDAP'|'FREEIPA'|'LINUX_SSH'
+export type ConnectorTypeName='ACTIVE_DIRECTORY'|'GENERIC_LDAP'|'FREEIPA'|'LINUX_SSH'|'ENTRA_ID'
 
 export interface ConnectorConfiguration {
   url?:string;baseDn?:string;bindDn?:string;bindPassword?:string;tls?:boolean;tlsRejectUnauthorized?:boolean;pageSize?:number;authenticationMode?:string
   freeipaUrl?:string;freeipaBaseDn?:string;freeipaBindDn?:string;freeipaBindPassword?:string;freeipaTls?:boolean;freeipaTlsRejectUnauthorized?:boolean;freeipaConnectTimeoutMs?:number;freeipaOperationTimeoutMs?:number;freeipaPageSize?:number
   sshHost?:string;sshPort?:number;sshUsername?:string;sshPassword?:string;sshPrivateKey?:string;sshPrivateKeyPassphrase?:string;sshConnectTimeoutMs?:number;sshCommandTimeoutMs?:number;sshHostKeyFingerprint?:string;sshStrictHostKeyChecking?:boolean
+  entraTenantId?:string;entraClientId?:string;entraClientSecret?:string;entraCertificateThumbprint?:string;entraUseDeviceCode?:boolean;entraRedirectUri?:string
 }
 
 export interface Connector{
