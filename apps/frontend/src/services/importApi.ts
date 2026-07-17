@@ -11,6 +11,7 @@ import type {
   CorrelationResult,
   ConversionResult,
   ImportGraphPreview,
+  ImportPersistenceSummary,
 } from '../types/import'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -170,4 +171,22 @@ export async function getNormalizedPreview(importId: string): Promise<{
   records: NormalizedRecord[]
 }[]> {
   return apiFetch(`/imports/${importId}/normalized-preview`)
+}
+
+export async function persistImport(importId: string): Promise<ImportPersistenceSummary> {
+  return apiFetch<ImportPersistenceSummary>(`/imports/${importId}/persist`, { method: 'POST' })
+}
+
+export async function runRiskScan(graphSource: 'auto' | 'neo4j' | 'memory' = 'neo4j'): Promise<{
+  rulesRun: number
+  findingsDetected: number
+  totalFindings: number
+  durationMs: number
+  graphSource: string
+}> {
+  return apiFetch('/risk/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ graphSource }),
+  })
 }

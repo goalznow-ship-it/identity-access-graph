@@ -198,6 +198,14 @@ export interface ImportGraphPreview {
   warnings: string[]
   pagination: { nodeLimit: number; relationshipLimit: number; totalNodes: number; totalRelationships: number; truncated: boolean }
 }
+export interface ImportPersistenceSummary {
+  nodesUpserted: number
+  relationshipsUpserted: number
+  skipped: number
+  conflicts: number
+  durationMs: number
+}
+
 export interface ConversionResult {
   nodesCreated: number
   relationshipsCreated: number
