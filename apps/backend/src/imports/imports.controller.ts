@@ -1,9 +1,10 @@
 import {
-  Controller, Post, Put, Get, HttpCode, HttpException, HttpStatus,
+  Controller, Post, Put, Get, Delete, HttpCode, HttpException, HttpStatus,
   UseInterceptors, UploadedFiles, Param, Body, Query,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger'
 import { FilesInterceptor } from '@nestjs/platform-express'
+import { IMPORT_CONFIG } from './import-config'
 import { ImportsService } from './imports.service'
 import { MappingService } from './mapping/mapping.service'
 import { ValidationService } from './validation/validation.service'
@@ -26,12 +27,18 @@ export class ImportsController {
     private readonly persistenceService: ImportGraphPersistenceService,
   ) {}
 
+  @Get('limits')
+  @ApiOperation({ summary: 'Get import limits configuration' })
+  getLimits() {
+    return this.service.getLimits()
+  }
+
   @Post('upload')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Upload Excel/CSV files for import' })
+  @ApiOperation({ summary: 'Upload Excel/CSV/JSON files for import' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Files uploaded and inspected' })
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(FilesInterceptor('files', 50))
   async upload(@UploadedFiles() files: Express.Multer.File[]) {
     if (!files || files.length === 0) {
       throw new HttpException('No files provided.', HttpStatus.BAD_REQUEST)
@@ -51,6 +58,55 @@ export class ImportsController {
     const session = this.service.getSession(importId)
     if (!session) {
       throw new HttpException('Import session not found.', HttpStatus.NOT_FOUND)
+    }
+    return session
+  }
+
+  @Get(':importId/progress')
+  @ApiOperation({ summary: 'Get import progress' })
+  @ApiResponse({ status: 200, description: 'Progress data' })
+  getProgress(@Param('importId') importId: string) {
+    const progress = this.service.getProgress(importId)
+    if (!progress) {
+      throw new HttpException('Import session not found.', HttpStatus.NOT_FOUND)
+    }
+    return progress
+  }
+
+  @Post(':importId/cancel')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Cancel an import session' })
+  cancel(@Param('importId') importId: string) {
+    if (!this.service.cancel(importId)) {
+      throw new HttpException('Import session not found.', HttpStatus.NOT_FOUND)
+    }
+    return { status: 'cancelled' }
+  }
+
+  @Post(':importId/files/:fileId/retry')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Retry a failed file' })
+  async retryFile(
+    @Param('importId') importId: string,
+    @Param('fileId') fileId: string,
+  ) {
+    const session = await this.service.retryFile(importId, fileId)
+    if (!session) {
+      throw new HttpException('File not found or not in error state.', HttpStatus.NOT_FOUND)
+    }
+    return session
+  }
+
+  @Delete(':importId/files/:fileId')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Remove a file from an import session' })
+  removeFile(
+    @Param('importId') importId: string,
+    @Param('fileId') fileId: string,
+  ) {
+    const session = this.service.removeFile(importId, fileId)
+    if (!session) {
+      throw new HttpException('File not found.', HttpStatus.NOT_FOUND)
     }
     return session
   }
@@ -230,7 +286,7 @@ export class ImportsController {
         const sheet = file.sheets[si]
         const mappings = this.service.getMappings(importId, file.id, si)
           ?? this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
-        const preview = generateNormalizedPreview(sheet.previewRows, mappings, 20)
+        const preview = generateNormalizedPreview(sheet.previewRows, mappings, IMPORT_CONFIG.previewRows)
         results.push({
           fileId: file.id,
           originalName: file.originalName,
@@ -291,7 +347,11 @@ export class ImportsController {
     const records = this.buildCorrelationRecords(importId)
     const correlation = this.service.getCorrelationResult(importId) ?? this.correlationService.correlate(importId, records)
     this.service.setCorrelationResult(importId, correlation)
-    const result = this.conversionService.convert(importId, records, correlation, body.nodeLimit ?? 500, body.relationshipLimit ?? 2000)
+    const result = this.conversionService.convert(
+      importId, records, correlation,
+      body.nodeLimit ?? IMPORT_CONFIG.maxGraphPreviewNodes,
+      body.relationshipLimit ?? IMPORT_CONFIG.maxGraphPreviewRelationships,
+    )
     this.service.setConversionResult(importId, result)
     return result
   }
@@ -299,8 +359,8 @@ export class ImportsController {
   @Get(':importId/graph-preview')
   getGraphPreview(@Param('importId') importId: string, @Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
     const requestedLimits = nodeLimit !== undefined || relationshipLimit !== undefined
-    const parsedNodeLimit = Number(nodeLimit ?? 500)
-    const parsedRelationshipLimit = Number(relationshipLimit ?? 2000)
+    const parsedNodeLimit = Number(nodeLimit ?? IMPORT_CONFIG.maxGraphPreviewNodes)
+    const parsedRelationshipLimit = Number(relationshipLimit ?? IMPORT_CONFIG.maxGraphPreviewRelationships)
     if (requestedLimits && (!Number.isInteger(parsedNodeLimit) || parsedNodeLimit < 0 || !Number.isInteger(parsedRelationshipLimit) || parsedRelationshipLimit < 0)) {
       throw new HttpException('Preview limits must be non-negative integers.', HttpStatus.BAD_REQUEST)
     }

@@ -1,4 +1,5 @@
 export { FileDropzone } from './FileDropzone'
+export { ImportLimitsPanel } from './ImportLimitsPanel'
 export { UploadedFileList } from './UploadedFileList'
 export { WorkbookInspector } from './WorkbookInspector'
 export { SheetPreview } from './SheetPreview'

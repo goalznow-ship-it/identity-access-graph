@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { IMPORT_CONFIG } from '../import-config'
 import type { ValidationIssue } from '../mapping/value-patterns'
 import type { ColumnMapping } from '../mapping/mapping.service'
 import { detectDuplicateValues } from './duplicate-detector'
@@ -171,6 +172,23 @@ export class ValidationService {
     }
     if (teamCol) {
       allIssues.push(...validateReferences(rows, teamCol, 'team', knownTeams, file, sheet, 'team'))
+    }
+
+    const maxIssues = IMPORT_CONFIG.maxValidationIssues
+    if (allIssues.length > maxIssues) {
+      allIssues.length = maxIssues
+      allIssues.push({
+        code: 'TRUNCATED',
+        severity: 'WARNING',
+        message: `Validation issue limit of ${maxIssues} reached; results truncated.`,
+        file,
+        sheet,
+        row: 0,
+        sourceColumn: '',
+        targetField: '',
+        rawValue: '',
+        suggestedResolution: 'Fix reported issues and re-validate.',
+      })
     }
 
     const summary = { total: 0, info: 0, warning: 0, error: 0, critical: 0 }

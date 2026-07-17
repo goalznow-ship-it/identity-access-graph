@@ -7,7 +7,12 @@ export type DatasetType =
   | 'Organizational Units' | 'Domains'
   | 'Unknown'
 
-export type ImportStatus = 'uploading' | 'uploaded' | 'inspected' | 'classified' | 'error'
+export type ImportStatus = 'uploading' | 'uploaded' | 'inspected' | 'classified' | 'error' | 'mapped' | 'validated'
+
+export type ImportPhase =
+  | 'idle' | 'uploading' | 'parsing' | 'classifying' | 'mapping'
+  | 'validating' | 'correlating' | 'converting' | 'persisting'
+  | 'completed' | 'cancelled' | 'failed'
 
 export interface ImportFile {
   id: string
@@ -19,6 +24,17 @@ export interface ImportFile {
   sheets: SheetInfo[]
   error?: string
   filePath?: string
+  progress?: FileProgress
+}
+
+export interface FileProgress {
+  phase: ImportPhase
+  percent: number
+  rowsProcessed: number
+  totalRows: number
+  throughput: number
+  elapsedMs: number
+  estimatedRemainingMs: number
 }
 
 export interface SheetInfo {
@@ -34,7 +50,7 @@ export interface SheetInfo {
 }
 
 export interface SheetWarning {
-  type: 'empty_columns' | 'duplicate_rows' | 'empty_sheet'
+  type: 'empty_columns' | 'duplicate_rows' | 'empty_sheet' | 'truncated'
   message: string
   column?: string
   count?: number
@@ -46,25 +62,34 @@ export interface ClassificationResult {
   matchedPatterns: string[]
 }
 
-export interface UploadResponse {
+export interface ImportSession {
   importId: string
   files: ImportFile[]
+  progress?: SessionProgress
+  createdAt: number
+  cancelled?: boolean
 }
 
-export interface InspectResponse {
-  importId: string
-  files: ImportFile[]
+export interface SessionProgress {
+  status: ImportPhase
+  currentFileId?: string
+  filesCompleted: number
+  filesFailed: number
+  totalRows: number
+  rowsProcessed: number
+  percent: number
+  throughput: number
+  elapsedMs: number
+  estimatedRemainingMs: number
+  warnings: string[]
+  truncated: boolean
+  truncationReason?: string
 }
 
 export interface ClassifyRequest {
   fileId: string
   sheetIndex: number
   type: DatasetType
-}
-
-export interface ImportSession {
-  importId: string
-  files: ImportFile[]
 }
 
 export interface MappingOverride {
@@ -82,4 +107,26 @@ export interface ApplyMappingsRequest {
 export interface ValidateRequest {
   fileId: string
   sheetIndex: number
+}
+
+export interface TruncationInfo {
+  truncated: boolean
+  reason?: string
+  totalRows: number
+  maxRows: number
+}
+
+export interface ImportLimits {
+  maxFileSizeMb: number
+  maxFilesPerSession: number
+  maxRowsPerFile: number
+  maxRowsPerSheet: number
+  maxSheetsPerWorkbook: number
+  previewRows: number
+  previewColumns: number
+  maxCellLength: number
+  sessionTtlMinutes: number
+  maxConcurrentSessions: number
+  maxConcurrentFiles: number
+  chunkSizeRows: number
 }

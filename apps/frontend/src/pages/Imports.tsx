@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, UploadCloud, RefreshCw, ChevronRight, CheckCircle } from 'lucide-react'
+import { Upload, UploadCloud, RefreshCw, ChevronRight, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { FileDropzone, UploadedFileList, WorkbookInspector, ColumnMappingEditor, ValidationSummary, ValidationIssueList, NormalizedPreview, IdentityCorrelationSummary, CorrelationGroupCard, CorrelationConflictList, GraphConversionSummary, ImportGraphPreview, UnresolvedReferenceList } from '../components/imports'
+import { FileDropzone, UploadedFileList, WorkbookInspector, ColumnMappingEditor, ValidationSummary, ValidationIssueList, NormalizedPreview, IdentityCorrelationSummary, CorrelationGroupCard, CorrelationConflictList, GraphConversionSummary, ImportGraphPreview, UnresolvedReferenceList, ImportLimitsPanel } from '../components/imports'
 import { useFileImport } from '../hooks/useFileImport'
 import { useColumnMapping } from '../hooks/useColumnMapping'
 import { useImportValidation } from '../hooks/useImportValidation'
@@ -16,8 +16,8 @@ type ImportStep = 'upload' | 'classify' | 'map' | 'validate' | 'preview' | 'corr
 export function ImportsPage() {
   const navigate = useNavigate()
   const {
-    pendingFiles, session, uploading, error,
-    addFiles, removeFile, clearFiles, upload, classify, setError,
+    pendingFiles, session, uploading, error, limits, progress, cancelling, retrying,
+    addFiles, removeFile, clearFiles, upload, classify, cancel, retry, removeSessionFile, setError,
   } = useFileImport()
 
   const [step, setStep] = useState<ImportStep>('upload')
@@ -89,11 +89,14 @@ export function ImportsPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-5xl flex-col p-4">
-      <div className="mb-4">
-        <h1 className="text-lg font-semibold text-gray-100">Import Data</h1>
-        <p className="text-sm text-gray-500">
-          Upload Excel or CSV files to import identities, groups, applications, and infrastructure data.
-        </p>
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-100">Import Data</h1>
+          <p className="text-sm text-gray-500">
+            Upload Excel, CSV or JSON files to import identities, groups, applications, and infrastructure data.
+          </p>
+        </div>
+        {limits && <ImportLimitsPanel limits={limits} />}
       </div>
 
       {error && (
@@ -103,9 +106,47 @@ export function ImportsPage() {
         </div>
       )}
 
+      {progress && (
+        <div className="mb-4 space-y-2 rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-gray-300 capitalize">Status: {progress.status}</span>
+            <span className="text-gray-400">{progress.percent}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-700">
+            <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${progress.percent}%` }} />
+          </div>
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>Rows: {progress.rowsProcessed.toLocaleString()}{progress.totalRows > 0 ? ` / ${progress.totalRows.toLocaleString()}` : ''}</span>
+            {progress.throughput > 0 && <span>{(progress.throughput / 1000).toFixed(1)}K rows/s</span>}
+            {progress.estimatedRemainingMs > 0 && <span>~{Math.ceil(progress.estimatedRemainingMs / 1000)}s remaining</span>
+            }
+          </div>
+          {progress.truncated && (
+            <div className="flex items-center gap-1 text-xs text-yellow-400">
+              <span>Truncated: {progress.truncationReason || 'Row limit reached'}</span>
+            </div>
+          )}
+          {progress.warnings.length > 0 && (
+            <div className="max-h-16 overflow-y-auto text-xs text-yellow-400">
+              {progress.warnings.map((w, i) => <div key={i}>{w}</div>)}
+            </div>
+          )}
+          {progress.status !== 'cancelled' && progress.status !== 'completed' && (
+            <button
+              onClick={cancel}
+              disabled={cancelling}
+              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
+            >
+              <XCircle className="h-3 w-3" />
+              {cancelling ? 'Cancelling...' : 'Cancel import'}
+            </button>
+          )}
+        </div>
+      )}
+
       {!session && (
         <div className="space-y-4">
-          <FileDropzone onFilesSelected={addFiles} disabled={uploading} />
+          <FileDropzone onFilesSelected={addFiles} disabled={uploading} maxFileSizeMb={limits?.maxFileSizeMb} previewRows={limits?.previewRows} />
 
           {pendingFiles.length > 0 && (
             <>
@@ -151,6 +192,15 @@ export function ImportsPage() {
               New import
             </button>
           </div>
+
+          <UploadedFileList
+            files={[]}
+            onRemove={() => {}}
+            sessionFiles={session.files}
+            onRetry={retry}
+            onRemoveSessionFile={removeSessionFile}
+            retrying={retrying}
+          />
 
           <div className="flex gap-2 border-b border-border pb-2">
             <button

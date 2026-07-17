@@ -9,6 +9,11 @@ export type DatasetType =
 
 export type ImportStatus = 'uploading' | 'uploaded' | 'inspected' | 'classified' | 'error' | 'mapped' | 'validated'
 
+export type ImportPhase =
+  | 'idle' | 'uploading' | 'parsing' | 'classifying' | 'mapping'
+  | 'validating' | 'correlating' | 'converting' | 'persisting'
+  | 'completed' | 'cancelled' | 'failed'
+
 export interface ImportFile {
   id: string
   originalName: string
@@ -18,6 +23,17 @@ export interface ImportFile {
   status: ImportStatus
   sheets: SheetInfo[]
   error?: string
+  progress?: FileProgress
+}
+
+export interface FileProgress {
+  phase: ImportPhase
+  percent: number
+  rowsProcessed: number
+  totalRows: number
+  throughput: number
+  elapsedMs: number
+  estimatedRemainingMs: number
 }
 
 export interface SheetInfo {
@@ -33,7 +49,7 @@ export interface SheetInfo {
 }
 
 export interface SheetWarning {
-  type: 'empty_columns' | 'duplicate_rows' | 'empty_sheet'
+  type: 'empty_columns' | 'duplicate_rows' | 'empty_sheet' | 'truncated'
   message: string
   column?: string
   count?: number
@@ -42,6 +58,40 @@ export interface SheetWarning {
 export interface ImportSession {
   importId: string
   files: ImportFile[]
+  progress?: SessionProgress
+  createdAt: number
+  cancelled?: boolean
+}
+
+export interface SessionProgress {
+  status: ImportPhase
+  currentFileId?: string
+  filesCompleted: number
+  filesFailed: number
+  totalRows: number
+  rowsProcessed: number
+  percent: number
+  throughput: number
+  elapsedMs: number
+  estimatedRemainingMs: number
+  warnings: string[]
+  truncated: boolean
+  truncationReason?: string
+}
+
+export interface ImportLimits {
+  maxFileSizeMb: number
+  maxFilesPerSession: number
+  maxRowsPerFile: number
+  maxRowsPerSheet: number
+  maxSheetsPerWorkbook: number
+  previewRows: number
+  previewColumns: number
+  maxCellLength: number
+  sessionTtlMinutes: number
+  maxConcurrentSessions: number
+  maxConcurrentFiles: number
+  chunkSizeRows: number
 }
 
 export interface PendingFile {

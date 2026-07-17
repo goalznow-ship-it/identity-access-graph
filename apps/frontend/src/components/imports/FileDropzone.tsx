@@ -4,9 +4,11 @@ import { Upload } from 'lucide-react'
 interface FileDropzoneProps {
   onFilesSelected: (files: FileList | File[]) => void
   disabled?: boolean
+  maxFileSizeMb?: number
+  previewRows?: number
 }
 
-export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
+export function FileDropzone({ onFilesSelected, disabled, maxFileSizeMb, previewRows }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -64,7 +66,8 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
         {dragging ? 'Drop files here' : 'Drag & drop files or click to browse'}
       </p>
       <p className="mt-1 text-xs text-gray-500">
-        .xlsx, .xls, .csv &mdash; up to 50MB per file
+        .xlsx, .xls, .csv, .json, .jsonl &mdash; up to {maxFileSizeMb ?? 250}MB per file
+        {previewRows ? ` &middot; ${previewRows} preview rows` : ''}
       </p>
     </div>
   )
