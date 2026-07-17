@@ -1,4 +1,4 @@
-import { Client } from 'ssh2'
+import { Client, type ClientChannel } from 'ssh2'
 import { createHash } from 'node:crypto'
 import type { ConnectorConfiguration } from '../connector.types'
 
@@ -99,7 +99,7 @@ export class LibSshRunner {
         reject(new Error(`SSH command timed out after ${cmdTimeout}ms: ${command}`))
       }, cmdTimeout)
 
-      this.client!.exec(command, (err, stream) => {
+      this.client!.exec(command, (err: Error | undefined, stream: ClientChannel) => {
         if (err) { clearTimeout(timer); reject(err); return }
         stream.on('data', (data: Buffer) => {
           if (stdout.length < MAX_OUTPUT_SIZE) {

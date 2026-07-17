@@ -37,7 +37,6 @@ export interface Container extends BaseNode {
   environmentVariables?: Record<string, string>
   hostId?: string
   clusterId?: string
-  status?: string
 }
 
 export interface KubernetesCluster extends BaseNode {
