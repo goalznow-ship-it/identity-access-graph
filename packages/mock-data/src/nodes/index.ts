@@ -607,13 +607,13 @@ export const gpos: GroupPolicy[] = [
     computerSettings: { passwordPolicy: { minLength: 14, complexity: true }, auditPolicy: { logonEvents: 'Success,Failure' } },
     nodeType: NodeType.GroupPolicy, sourceSystem: SourceSystem.ActiveDirectory,
     metadata: {}, createdAt: TS, updatedAt: TS, status: AccountStatus.Active, riskLevel: RiskLevel.Medium,
-    enabled: true, deleted: false, critical: true }),
+    deleted: false, critical: true }),
   n({ id: 'gpo-windows-update', displayName: 'Windows Update Policy', domainId: 'dom-nexus',
     organizationalUnitIds: ['ou-servers'], enforced: false, enabled: true, revisionNumber: 3,
     computerSettings: { windowsUpdate: { autoUpdate: true, updateDay: 'Tuesday' } },
     nodeType: NodeType.GroupPolicy, sourceSystem: SourceSystem.ActiveDirectory,
     metadata: {}, createdAt: TS, updatedAt: TS, status: AccountStatus.Active, riskLevel: RiskLevel.Low,
-    enabled: true, deleted: false, critical: false }),
+    deleted: false, critical: false }),
 ]
 
 // ── Aggregate ───────────────────────────────────────────────────

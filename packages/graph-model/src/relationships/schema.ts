@@ -11,7 +11,7 @@ export interface RelationshipDefinition {
   inverseName?: string
 }
 
-const R = (
+function R(
   name: string,
   source: string,
   target: string,
@@ -19,9 +19,30 @@ const R = (
   desc: string,
   neo4jType: string,
   category: string,
-  adAttr?: string,
+): RelationshipDefinition
+function R(
+  name: string,
+  source: string,
+  target: string,
+  card: string,
+  desc: string,
+  adAttr: string | undefined,
+  neo4jType: string,
+  category: string,
   inverse?: string,
-): RelationshipDefinition => ({
+): RelationshipDefinition
+function R(
+  name: string,
+  source: string,
+  target: string,
+  card: string,
+  desc: string,
+  ...metadata: [neo4jType: string, category: string] | [adAttr: string | undefined, neo4jType: string, category: string, inverse?: string]
+): RelationshipDefinition {
+  const [adAttr, neo4jType, category, inverse] = metadata.length === 2
+    ? [undefined, metadata[0], metadata[1], undefined]
+    : metadata
+  return {
   name,
   sourceNode: source,
   targetNode: target,
@@ -32,7 +53,8 @@ const R = (
   category,
   bidirectional: !!inverse,
   inverseName: inverse,
-})
+  }
+}
 
 export const RELATIONSHIPS: Record<string, RelationshipDefinition> = {
   // ── Membership ──────────────────────────────────────────────
