@@ -5,7 +5,7 @@
   "description": "Identity Access Graph - Backend",
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
+    "build": "nest build",
     "test": "tsx --test src/pipeline/__tests__/*.test.ts src/imports/__tests__/*.test.ts src/neo4j/__tests__/*.test.ts src/risk/__tests__/*.test.ts src/attack-path/__tests__/*.test.ts src/connectors/__tests__/*.test.ts src/identity/__tests__/*.test.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -36,6 +36,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.4.1",
     "@types/ssh2": "^1.15.5",
+    "ts-loader": "^9.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
   }
