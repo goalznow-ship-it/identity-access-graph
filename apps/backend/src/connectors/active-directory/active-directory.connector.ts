@@ -13,7 +13,7 @@ export class ActiveDirectoryConnector{
       for(const[type,baseFilter]of Object.entries(AD_FILTERS)){
         if(entries.length>=limit)break
         const filter=watermark?andFilter(baseFilter,changedSinceFilter(watermark)):baseFilter
-        const pages=await client.pagedSearch({baseDn:connector.configuration.baseDn,filter,attributes:[...ALL_AD_ATTRIBUTES,'objectClass','uSNChanged'],pageSize:connector.configuration.pageSize??500,sizeLimit:limit-entries.length,signal,operationTimeoutMs:connector.configuration.operationTimeoutMs})
+        const pages=await client.pagedSearch({baseDn:connector.configuration.baseDn??'',filter,attributes:[...ALL_AD_ATTRIBUTES,'objectClass','uSNChanged'],pageSize:connector.configuration.pageSize??500,sizeLimit:limit-entries.length,signal,operationTimeoutMs:connector.configuration.operationTimeoutMs})
         pageCounts[type]=pages.length;entries.push(...pages.flatMap(page=>page.entries).slice(0,limit-entries.length))
       }
       const namingContexts=await client.discoverNamingContexts()

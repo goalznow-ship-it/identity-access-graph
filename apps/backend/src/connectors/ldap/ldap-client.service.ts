@@ -5,7 +5,7 @@ import type { LdapClient,LdapEntry,LdapSearchOptions } from './ldap-client.inter
 import { paginateEntries } from './ldap-paging'
 export class LdapClientService implements LdapClient{
   private client:Client
-  constructor(private configuration:ConnectorConfiguration){this.client=new Client({url:configuration.url,timeout:configuration.operationTimeoutMs,connectTimeout:configuration.connectTimeoutMs,tlsOptions:{rejectUnauthorized:configuration.tlsRejectUnauthorized!==false}})}
+  constructor(private configuration:ConnectorConfiguration){this.client=new Client({url:configuration.url ?? "",timeout:configuration.operationTimeoutMs,connectTimeout:configuration.connectTimeoutMs,tlsOptions:{rejectUnauthorized:configuration.tlsRejectUnauthorized!==false}})}
   async bind(dn:string,password:string){try{await this.client.bind(dn,password)}catch(error){throw mapLdapError(error)}}
   async unbind(){try{await this.client.unbind()}catch{/* connection is already closed */}}
   async rootDSE(){try{const result=await this.client.search('',{scope:'base',filter:'(objectClass=*)',attributes:['namingContexts','defaultNamingContext','configurationNamingContext','rootDomainNamingContext']});return result.searchEntries[0]??{}}catch(error){throw mapLdapError(error)}}
