@@ -8,6 +8,7 @@ import { Neo4jModule } from '../neo4j'
 import { RiskModule } from '../risk'
 import { AttackPathModule } from '../attack-path'
 import { ConnectorsModule } from '../connectors'
+import { IdentityModule } from '../identity'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ConnectorsModule } from '../connectors'
     RiskModule,
     AttackPathModule,
     ConnectorsModule,
+    IdentityModule,
   ],
 })
 export class AppModule {}
