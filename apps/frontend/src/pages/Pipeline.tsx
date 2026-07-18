@@ -33,9 +33,9 @@ export function PipelinePage() {
       className="mx-auto max-w-5xl space-y-8 pb-8"
     >
       <div>
-        <h1 className="text-2xl font-semibold text-gray-100">Pipeline Simulator</h1>
+        <h1 className="text-2xl font-semibold text-gray-100">Pipeline Operations</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Run the identity resolution pipeline step by step or in full.
+          Run and inspect the current identity-resolution pipeline. This workspace uses the built-in demonstration dataset until a persisted graph source is selected.
         </p>
       </div>
 

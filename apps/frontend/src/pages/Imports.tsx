@@ -126,17 +126,15 @@ export function ImportsPage() {
       getSession(restoreImportId)
         .then((sess) => {
           setSession(sess)
+          if (sess.files.length > 0) {
+            const first = sess.files[0]
+            setSelectedFile(first)
+            setSelectedSheet(first.sheets[0] ?? null)
+            setSheetIndex(0)
+          }
           setEffectiveStep(() => {
             if (urlStep && STEP_KEYS[urlStep]) return urlStep
             if (storedImport?.step && STEP_KEYS[storedImport.step]) return storedImport.step
-            if (sess.files.length > 0) {
-              const first = sess.files[0]
-              setSelectedFile(first)
-              if (first.sheets.length > 0) {
-                setSelectedSheet(first.sheets[0])
-                setSheetIndex(0)
-              }
-            }
             return 'inspect'
           })
           const restoredStep = urlStep ?? storedImport?.step ?? 'inspect'
@@ -153,15 +151,36 @@ export function ImportsPage() {
   }, [])
 
   const updateStepAndUrl = useCallback((step: WorkflowStepId) => {
+    setCompletedSteps((prev) => new Set(prev).add(effectiveStep))
     setEffectiveStep(step)
-    setCompletedSteps((prev) => new Set(prev).add(step))
     setSearchParams((prev) => { prev.set('step', step); return prev }, { replace: true })
-  }, [setSearchParams])
+  }, [effectiveStep, setSearchParams])
 
   const goToNextStep = useCallback(() => {
     const next = getNextStep(effectiveStep)
     if (next) updateStepAndUrl(next)
   }, [effectiveStep, updateStepAndUrl])
+
+  useEffect(() => {
+    if (!session?.importId || loadingSession) return
+    let cancelled = false
+
+    const restoreWorkflowArtifacts = async () => {
+      try {
+        const validations = await validation.fetchValidationResults(session.importId)
+        if (!cancelled && selectedFile) {
+          const current = validations.find((item) => item.fileId === selectedFile.id && item.sheetIndex === sheetIndex)
+          if (current) setValidationResult(current)
+        }
+      } catch {}
+
+      try { await correlation.restore(session.importId) } catch {}
+      try { await conversion.restore(session.importId) } catch {}
+    }
+
+    void restoreWorkflowArtifacts()
+    return () => { cancelled = true }
+  }, [session?.importId, loadingSession, selectedFile?.id, sheetIndex])
 
   useEffect(() => {
     if (session?.files.length && effectiveStep === 'upload' && !loadingSession) {
@@ -248,7 +267,6 @@ export function ImportsPage() {
     if (!session) return
     try {
       await conversion.convert(session.importId)
-      updateStepAndUrl('persist')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Graph conversion failed')
     }
@@ -272,12 +290,24 @@ export function ImportsPage() {
     setSearchParams({}, { replace: true })
   }, [clearFiles, setSearchParams])
 
+  useEffect(() => {
+    const completed = new Set<WorkflowStepId>()
+    if (session?.files.length) completed.add('upload')
+    if (selectedFile) completed.add('inspect')
+    if (columnMapping.mappings.length > 0) completed.add('map')
+    if (validationResult) completed.add('validate')
+    if (correlation.result) completed.add('correlate')
+    if (conversion.result) completed.add('graphPreview')
+    if (persistenceSummary) { completed.add('persist'); completed.add('complete') }
+    setCompletedSteps((previous) => new Set([...previous, ...completed]))
+  }, [session?.files.length, selectedFile?.id, columnMapping.mappings.length, validationResult, correlation.result, conversion.result, persistenceSummary])
+
   const blockedReason = (() => {
     if (effectiveStep === 'inspect' && !selectedFile) return 'Select a file to inspect'
     if (effectiveStep === 'map' && !selectedFile) return 'Select a file to map columns'
     if (effectiveStep === 'validate' && !validationResult) return 'Run validation first'
     if (effectiveStep === 'correlate' && !correlation.result) return 'Run correlation first'
-    if (effectiveStep === 'graphPreview' && !conversion.result) return 'Run graph conversion first'
+    if (effectiveStep === 'graphPreview' && !correlation.result) return 'Run correlation first'
     if (effectiveStep === 'persist' && !conversion.result) return 'Run graph conversion first'
     return null
   })()
@@ -320,7 +350,7 @@ export function ImportsPage() {
       {progress && (
         <div className="mb-4 space-y-2 rounded-lg border border-border bg-card p-3 text-sm">
           <div className="flex items-center justify-between">
-            <span className="font-medium text-gray-300 capitalize">Status: {progress.status}</span>
+            <span className="font-medium text-gray-300 capitalize">File processing: {progress.status}</span>
             <span className="text-gray-400">{progress.percent}%</span>
           </div>
           <div className="h-2 rounded-full bg-gray-700">
@@ -564,14 +594,7 @@ export function ImportsPage() {
                 {correlation.result ? (
                   <>
                     <Button variant="ghost" onClick={() => updateStepAndUrl('validate')}>Back to Validation</Button>
-                    <Button onClick={handleConversion} disabled={conversion.loading}>
-                      {conversion.loading ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                      ) : (
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                      )}
-                      {conversion.loading ? 'Converting...' : 'Convert to Graph'}
-                    </Button>
+                    <Button onClick={() => updateStepAndUrl('graphPreview')}>Next: Build Graph</Button>
                   </>
                 ) : (
                   <Button onClick={handleCorrelation} disabled={correlation.loading}>
@@ -601,8 +624,12 @@ export function ImportsPage() {
                   <span className="ml-2 text-sm text-gray-400">Building graph preview...</span>
                 </div>
               ) : (
-                <div className="flex items-center justify-center py-8 text-sm text-gray-500">
-                  No graph data yet. Run graph conversion first.
+                <div className="space-y-4 rounded-lg border border-border bg-card p-6 text-center">
+                  <p className="text-sm text-gray-300">Correlation is complete. Build the graph preview to continue.</p>
+                  <Button onClick={handleConversion} disabled={conversion.loading || !correlation.result}>
+                    {conversion.loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-1 h-4 w-4" />}
+                    {conversion.loading ? 'Building graph...' : 'Build Graph Preview'}
+                  </Button>
                 </div>
               )}
 

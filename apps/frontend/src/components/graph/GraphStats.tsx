@@ -1,4 +1,3 @@
-import { Card } from '../ui/Card'
 import type { GraphData, GraphNode, RiskLevel } from '../../types/graph'
 
 interface GraphStatsProps {
@@ -13,7 +12,6 @@ export function GraphStats({ data, selectedNode }: GraphStatsProps) {
   const visibleLinks = data.links.length
   const criticalNodes = data.nodes.filter((n) => n.riskLevel === 'CRITICAL' as RiskLevel).length
   const sourceCount = new Set(data.nodes.map((node) => node.sourceSystem)).size
-  const density = visibleNodes > 1 ? (visibleLinks / (visibleNodes * (visibleNodes - 1))).toFixed(3) : '0'
   const degree = selectedNode
     ? data.links.filter(
         (l) =>
@@ -24,20 +22,19 @@ export function GraphStats({ data, selectedNode }: GraphStatsProps) {
 
   const stats = [
     { label: 'Nodes', value: visibleNodes },
-    { label: 'Relationships', value: visibleLinks },
-    { label: 'Critical', value: criticalNodes },
+    { label: 'Edges', value: visibleLinks },
+    { label: 'Critical', value: criticalNodes, warn: criticalNodes > 0 },
     { label: 'Sources', value: sourceCount },
-    { label: 'Density', value: density },
     ...(selectedNode ? [{ label: 'Degree', value: degree }] : []),
   ]
 
   return (
-    <div className="flex max-w-full gap-2 overflow-x-auto">
+    <div className="flex items-center gap-1.5">
       {stats.map((s) => (
-        <Card key={s.label} className="px-3 py-2" glass>
-          <p className="text-xs text-gray-500">{s.label}</p>
-          <p className="text-sm font-semibold text-gray-200">{s.value}</p>
-        </Card>
+        <div key={s.label} className={`rounded-lg border ${'warn' in s && s.warn ? 'border-red-500/20 bg-red-500/10' : 'border-border bg-card/40'} px-2.5 py-1.5`}>
+          <p className={`text-[10px] ${'warn' in s && s.warn ? 'text-red-400' : 'text-gray-500'}`}>{s.label}</p>
+          <p className="text-xs font-semibold text-gray-200">{s.value}</p>
+        </div>
       ))}
     </div>
   )

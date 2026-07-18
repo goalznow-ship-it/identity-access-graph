@@ -1,5 +1,5 @@
-import { RelationshipType, SourceSystem } from '@identity-access-graph/graph-model'
-import type { Relationship } from '@identity-access-graph/graph-model'
+import { RelationshipType, SourceSystem } from '../../../graph-model/src'
+import type { Relationship } from '../../../graph-model/src'
 
 const TS = '2024-01-01T00:00:00Z'
 

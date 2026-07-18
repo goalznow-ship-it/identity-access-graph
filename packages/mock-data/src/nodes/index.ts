@@ -1,13 +1,13 @@
 import {
   NodeType, SourceSystem, RiskLevel, AccountStatus, OperatingSystemType,
-} from '@identity-access-graph/graph-model'
+} from '../../../graph-model/src'
 import type {
   Forest, Domain, OrganizationalUnit, Department, Team, User, Group,
   Role, Permission, Computer, Host, OperatingSystem, Site, Subnet,
   LinuxUser, LinuxGroup, SudoPolicy, SSHKey, Application, Database,
   BusinessService, ServiceAccount, ManagedServiceAccount, GroupPolicy,
   Manager,
-} from '@identity-access-graph/graph-model'
+} from '../../../graph-model/src'
 
 const TS = '2024-01-01T00:00:00Z'
 

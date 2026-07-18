@@ -50,6 +50,22 @@ export class ImportsController {
     }
   }
 
+  @Get('active')
+  @ApiOperation({ summary: 'Get the most recent import session' })
+  getActiveSession() {
+    const session = this.service.getLatestSession()
+    if (!session) throw new HttpException('No import session is available.', HttpStatus.NOT_FOUND)
+    return session
+  }
+
+  @Get('active/graph-preview')
+  @ApiOperation({ summary: 'Get graph preview for the most recent import session' })
+  getActiveGraphPreview(@Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
+    const session = this.service.getLatestSession()
+    if (!session) throw new HttpException('No import session is available.', HttpStatus.NOT_FOUND)
+    return this.getGraphPreview(session.importId, nodeLimit, relationshipLimit)
+  }
+
   @Get(':importId')
   @ApiOperation({ summary: 'Get import session status' })
   @ApiResponse({ status: 200, description: 'Import session data' })

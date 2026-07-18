@@ -85,21 +85,21 @@ export function ColumnMappingEditor({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
             placeholder="Search columns..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-gray-100 focus:outline-none focus:border-primary"
+            className="w-full rounded-lg border border-border bg-surface py-2 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-500 transition focus:border-primary focus:outline-none"
           />
         </div>
 
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value as typeof filter)}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-primary"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-gray-200 transition focus:border-primary focus:outline-none"
         >
           <option value="all">All ({mappings.length})</option>
           <option value="mapped">Mapped ({mappedCount})</option>
@@ -108,55 +108,41 @@ export function ColumnMappingEditor({
           <option value="duplicate">Duplicates ({duplicateCount})</option>
         </select>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={onAutoMap}>Auto-map</Button>
           <Button variant="ghost" size="sm" onClick={onReset}>Reset</Button>
           <Button variant="ghost" size="sm" onClick={onValidate} disabled={mappedCount === 0}>
-            <AlertTriangle className="h-4 w-4 mr-1" />
+            <AlertTriangle className="mr-1 h-4 w-4" />
             Validate
           </Button>
           <Button variant="primary" size="sm" onClick={onApply} disabled={mappedCount === 0 || duplicateCount > 0}>
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Apply Mappings
+            <CheckCircle className="mr-1 h-4 w-4" />
+            Apply
           </Button>
         </div>
       </div>
 
       <div className="flex items-center gap-4 text-xs text-gray-500">
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
-          <span>Mapped: {mappedCount}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-gray-500" />
-          <span>Unmapped: {unmappedCount}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-yellow-500" />
-          <span>Required: {requiredCount}</span>
-        </div>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-success" /> Mapped: {mappedCount}</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gray-500" /> Unmapped: {unmappedCount}</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-warning" /> Required: {requiredCount}</span>
         {duplicateCount > 0 && (
-          <div className="flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 text-yellow-500" />
-            <span className="text-yellow-400">Duplicates: {duplicateCount}</span>
-          </div>
+          <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-warning" /><span className="text-warning">Duplicates: {duplicateCount}</span></span>
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-700 bg-gray-900/50 overflow-hidden">
-        <div className="grid grid-cols-12 gap-3 px-3 py-2 text-xs font-medium text-gray-400 border-b border-gray-700">
-          <div className="col-span-3">Source Column</div>
-          <div className="col-span-3">Sample Values</div>
-          <div className="col-span-3">Target Field</div>
-          <div className="col-span-2">Confidence</div>
-          <div className="col-span-1">Required</div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+        <div className="grid grid-cols-12 gap-3 border-b border-border px-3 py-2 text-xs font-medium text-gray-400">
+          <span className="col-span-3">Source Column</span>
+          <span className="col-span-3">Sample Values</span>
+          <span className="col-span-3">Target Field</span>
+          <span className="col-span-2">Confidence</span>
+          <span className="col-span-1">Req.</span>
         </div>
 
         <div className="max-h-96 overflow-y-auto">
           {filteredMappings.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              No columns match the current filter
-            </div>
+            <div className="px-4 py-8 text-center text-gray-500">No columns match the current filter</div>
           ) : (
             filteredMappings.map((mapping) => (
               <ColumnMappingRow
@@ -177,8 +163,8 @@ export function ColumnMappingEditor({
 
       <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
         <div>
-          <strong>Confidence Legend:</strong>
-          <div className="flex flex-wrap gap-2 mt-1">
+          <strong className="text-gray-400">Confidence:</strong>
+          <div className="mt-1 flex flex-wrap gap-2">
             <MappingConfidenceBadge confidence={100} />
             <MappingConfidenceBadge confidence={90} />
             <MappingConfidenceBadge confidence={70} />
@@ -187,13 +173,13 @@ export function ColumnMappingEditor({
           </div>
         </div>
         <div>
-          <strong>Icons:</strong>
-          <div className="flex flex-wrap gap-2 mt-1">
-            <span className="flex items-center gap-1 text-green-400"><CheckCircle className="h-3 w-3" /> Exact match (100%)</span>
-            <span className="flex items-center gap-1 text-yellow-400"><AlertTriangle className="h-3 w-3" /> Alias match (90%)</span>
-            <span className="flex items-center gap-1 text-blue-400"><Info className="h-3 w-3" /> Partial match (70%)</span>
-            <span className="flex items-center gap-1 text-purple-400"><Download className="h-3 w-3" /> Dataset hint (40%)</span>
-            <span className="flex items-center gap-1 text-red-400"><AlertCircle className="h-3 w-3" /> Duplicate target</span>
+          <strong className="text-gray-400">Icons:</strong>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <span className="flex items-center gap-1 text-green-400"><CheckCircle className="h-3 w-3" /> Exact</span>
+            <span className="flex items-center gap-1 text-yellow-400"><AlertTriangle className="h-3 w-3" /> Alias</span>
+            <span className="flex items-center gap-1 text-blue-400"><Info className="h-3 w-3" /> Partial</span>
+            <span className="flex items-center gap-1 text-purple-400"><Download className="h-3 w-3" /> Hint</span>
+            <span className="flex items-center gap-1 text-red-400"><AlertCircle className="h-3 w-3" /> Duplicate</span>
           </div>
         </div>
       </div>

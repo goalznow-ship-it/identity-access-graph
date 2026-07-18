@@ -14,13 +14,21 @@ import type {
   ImportPersistenceSummary,
 } from '../types/import'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+export class ImportApiError extends Error {
+  constructor(message: string, public readonly status: number) { super(message); this.name = 'ImportApiError' }
+}
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, options)
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(text || `Request failed: ${res.status}`)
+    let message = `Request failed: ${res.status}`
+    if (text) {
+      try { const body = JSON.parse(text); message = Array.isArray(body?.message) ? body.message.join(', ') : body?.message || body?.error || message } catch { message = text }
+    }
+    throw new ImportApiError(message, res.status)
   }
   return res.json()
 }
@@ -44,6 +52,15 @@ export async function uploadFiles(files: File[]): Promise<ImportSession> {
   }
 
   return res.json()
+}
+
+export async function getActiveImportSession(): Promise<ImportSession> {
+  return apiFetch<ImportSession>('/imports/active')
+}
+
+export async function getActiveImportGraphPreview(nodeLimit = 500, relationshipLimit = 2000): Promise<ImportGraphPreview> {
+  const params = new URLSearchParams({ nodeLimit: String(nodeLimit), relationshipLimit: String(relationshipLimit) })
+  return apiFetch<ImportGraphPreview>(`/imports/active/graph-preview?${params}`)
 }
 
 export async function getSession(importId: string): Promise<ImportSession> {

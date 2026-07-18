@@ -63,9 +63,9 @@ export function convertRelationships(records: CorrelationRecord[], recordNodeIds
     for (const rule of RULES) {
       for (const field of rule.fields) {
         for (const value of values(record.fields[field])) {
-          const target = resolver.resolve(value)
-          if (!target || target === source) {
-            unresolved.push({ recordId: record.recordId, field, value, relationshipType: rule.type, reason: target === source ? 'Self reference' : 'No unique target node' })
+          const target = resolver.resolve(value, source)
+          if (!target) {
+            unresolved.push({ recordId: record.recordId, field, value, relationshipType: rule.type, reason: 'No unique target node' })
             continue
           }
           const key = `${source}|${rule.type}|${target}`

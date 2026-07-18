@@ -31,7 +31,37 @@ const LABELED = new Set(['MEMBER_OF', 'HAS_ROLE', 'HAS_ACCESS_TO', 'REPORTS_TO',
 
 function collisionForce() {
   let nodes: GraphNode[] = []
-  const force = (alpha: number) => { const cell=72;const buckets = new Map<string, GraphNode[]>(); nodes.forEach((node) => { const x=node.x??0,y=node.y??0,gx=Math.floor(x/cell),gy=Math.floor(y/cell);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)buckets.get(`${gx+dx}:${gy+dy}`)?.forEach((other)=>{const ox=x-(other.x??0),oy=y-(other.y??0),distance=Math.hypot(ox,oy)||.1,radius=(nodeCollisionRadius(node)+nodeCollisionRadius(other))*.55;if(distance<radius){const push=(radius-distance)/distance*alpha*.48;if(node.fx==null){node.vx=(node.vx??0)+ox*push;node.vy=(node.vy??0)+oy*push}}});const key=`${gx}:${gy}`,bucket=buckets.get(key)??[];bucket.push(node);buckets.set(key,bucket)}) }
+  const force = (alpha: number) => {
+    const cell = 72
+    const buckets = new Map<string, GraphNode[]>()
+    nodes.forEach((node) => {
+      const x = node.x ?? 0
+      const y = node.y ?? 0
+      const gx = Math.floor(x / cell)
+      const gy = Math.floor(y / cell)
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          buckets.get(`${gx + dx}:${gy + dy}`)?.forEach((other) => {
+            const ox = x - (other.x ?? 0)
+            const oy = y - (other.y ?? 0)
+            const distance = Math.hypot(ox, oy) || 0.1
+            const radius = (nodeCollisionRadius(node) + nodeCollisionRadius(other)) * 0.55
+            if (distance < radius) {
+              const push = (radius - distance) / distance * alpha * 0.48
+              if (node.fx == null) {
+                node.vx = (node.vx ?? 0) + ox * push
+                node.vy = (node.vy ?? 0) + oy * push
+              }
+            }
+          })
+        }
+      }
+      const key = `${gx}:${gy}`
+      const bucket = buckets.get(key) ?? []
+      bucket.push(node)
+      buckets.set(key, bucket)
+    })
+  }
   force.initialize = (value: GraphNode[]) => { nodes = value }
   return force
 }
@@ -55,6 +85,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   const shortestNodes = useMemo(() => new Set(shortestPathNodeIds), [shortestPathNodeIds])
   const shortestLinks = useMemo(() => new Set(shortestPathLinkIds), [shortestPathLinkIds])
   const dense = data.links.length > 150 || data.links.length > data.nodes.length * 4
+  const inventoryMode = data.links.length === 0 && data.nodes.length > 0
 
   const applyLayout = useCallback((layout: GraphLayout) => {
     const nodes = data.nodes
@@ -67,6 +98,22 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     if(layout==='department'||layout==='source')[...groups.values()].forEach((group,index)=>{const angle=index/Math.max(1,groups.size)*Math.PI*2,ox=Math.cos(angle)*(140+groups.size*28),oy=Math.sin(angle)*(140+groups.size*28);group.forEach((node,item)=>{const a=item/Math.max(1,group.length)*Math.PI*2;node.fx=ox+Math.cos(a)*(30+group.length*3);node.fy=oy+Math.sin(a)*(30+group.length*3)})})
     fgRef.current?.d3ReheatSimulation(); window.setTimeout(() => fgRef.current?.zoomToFit(300, 40), 50)
   }, [data.nodes])
+
+  useEffect(() => {
+    if (!inventoryMode) return
+    const columns = Math.max(4, Math.ceil(Math.sqrt(data.nodes.length * 1.35)))
+    const spacingX = 150
+    const spacingY = 112
+    data.nodes.forEach((node, index) => {
+      const column = index % columns
+      const row = Math.floor(index / columns)
+      node.fx = (column - (columns - 1) / 2) * spacingX
+      node.fy = (row - (Math.ceil(data.nodes.length / columns) - 1) / 2) * spacingY
+      node.x = node.fx
+      node.y = node.fy
+    })
+    window.setTimeout(() => fgRef.current?.zoomToFit(450, 70), 80)
+  }, [inventoryMode, data.nodes])
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 250),
@@ -113,12 +160,18 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
 
   const degree = hoveredNode ? data.links.filter((link: any) => (typeof link.source === 'object' ? link.source.id : link.source) === hoveredNode.id || (typeof link.target === 'object' ? link.target.id : link.target) === hoveredNode.id).length : 0
   return <div ref={hostRef} className="graph-canvas-host relative h-full w-full" onClick={() => setMenu(null)} onMouseMove={(event) => setPointer({ x: event.nativeEvent.offsetX, y: event.nativeEvent.offsetY })}>
-    <ForceGraph2D ref={fgRef} graphData={data} nodeCanvasObject={nodeCanvasObject} nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(node.x, node.y, 18, 0, Math.PI * 2); ctx.fill() }} linkColor={linkColor} linkWidth={(link: any) => edgeWidth(linkState(link))} linkLineDash={(link: any) => edgeDash(link as GraphLink)} linkDirectionalArrowLength={4} linkDirectionalArrowRelPos={1} linkCanvasObjectMode={() => 'after'} linkCanvasObject={drawLinkLabel} onNodeHover={(node: any) => setHoveredNode(node as GraphNode | null)} onNodeClick={(node: any) => { const now = Date.now(); const previous = lastClick.current; if (previous && previous.id === node.id && now - previous.time < 350) onNodeDoubleClick?.(node as GraphNode); else onNodeClick(node as GraphNode); lastClick.current = { id: node.id, time: now } }} onLinkClick={(link: any) => onLinkClick?.(link as GraphLink)} onNodeRightClick={(node: any, event: MouseEvent) => { event.preventDefault(); setMenu({ node: node as GraphNode, x: event.offsetX, y: event.offsetY }) }} onBackgroundClick={onBackgroundClick} onZoom={(transform: { k: number }) => onZoomChange?.(transform.k)} onEngineStop={()=>{const key=data.nodes.map(node=>node.id).join('|');if(autoFitKey.current!==key){autoFitKey.current=key;fgRef.current?.zoomToFit(500,45)}}} cooldownTicks={data.nodes.length>1000?70:140} d3AlphaDecay={data.nodes.length>1000 ? .035 : .018} d3VelocityDecay={0.35} warmupTicks={data.nodes.length>1000?12:30} enableNodeDrag width={size.width} height={size.height} minZoom={0.1} maxZoom={10} />
+    <ForceGraph2D ref={fgRef} graphData={data} nodeCanvasObject={nodeCanvasObject} nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(node.x, node.y, 30, 0, Math.PI * 2); ctx.fill() }} linkColor={linkColor} linkWidth={(link: any) => edgeWidth(linkState(link))} linkLineDash={(link: any) => edgeDash(link as GraphLink)} linkDirectionalArrowLength={7} linkDirectionalArrowRelPos={1} linkCanvasObjectMode={() => 'after'} linkCanvasObject={drawLinkLabel} onNodeHover={(node: any) => setHoveredNode(node as GraphNode | null)} onNodeClick={(node: any) => { const now = Date.now(); const previous = lastClick.current; if (previous && previous.id === node.id && now - previous.time < 350) onNodeDoubleClick?.(node as GraphNode); else onNodeClick(node as GraphNode); lastClick.current = { id: node.id, time: now } }} onLinkClick={(link: any) => onLinkClick?.(link as GraphLink)} onNodeRightClick={(node: any, event: MouseEvent) => { event.preventDefault(); setMenu({ node: node as GraphNode, x: event.offsetX, y: event.offsetY }) }} onBackgroundClick={onBackgroundClick} onZoom={(transform: { k: number }) => onZoomChange?.(transform.k)} onEngineStop={()=>{const key=data.nodes.map(node=>node.id).join('|');if(autoFitKey.current!==key){autoFitKey.current=key;fgRef.current?.zoomToFit(500,45)}}} cooldownTicks={inventoryMode?1:(data.nodes.length>1000?70:140)} d3AlphaDecay={data.nodes.length>1000 ? .035 : .018} d3VelocityDecay={0.35} warmupTicks={inventoryMode?0:(data.nodes.length>1000?12:30)} enableNodeDrag={!inventoryMode} width={size.width} height={size.height} minZoom={0.22} maxZoom={10} />
     <GraphHoverTooltip node={hoveredNode} position={pointer} degree={degree} />
-    {menu && <div className="absolute z-50 w-52 rounded border border-border bg-surface p-1 text-xs shadow-xl" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
-      <div className="border-b border-border px-2 py-1 font-medium text-gray-200">{menu.node.displayName}</div>
-      {([['details','Open details'],['profile','Open 360 profile'],['center','Center'],['collapse','Collapse'],['hide','Hide'],['pin','Pin'],['dependencies','Show dependencies'],['paths-from','Find paths from this node'],['paths-to','Find paths to this node'],['privileged-reachability','Show privileged reachability'],['attack-workspace','Open Attack Path workspace']] as [GraphContextAction,string][]).map(([value,label]) => <button key={value} className="block w-full rounded px-2 py-1.5 text-left text-gray-300 hover:bg-white/5" onClick={() => action(value)}>{label}</button>)}
-      <div className="mt-1 border-t border-border p-1"><div className="mb-1 text-gray-500">Expand neighbors</div><div className="flex gap-1"><select value={direction} onChange={(event) => setDirection(event.target.value as typeof direction)} className="min-w-0 flex-1 bg-card"><option value="both">Both</option><option value="incoming">Incoming</option><option value="outgoing">Outgoing</option></select><select value={depth} onChange={(event) => setDepth(Number(event.target.value))} className="bg-card">{[1,2,3,4,5].map((value) => <option key={value}>{value}</option>)}</select><button className="rounded bg-primary px-2" onClick={() => action('expand')}>Go</button></div></div>
+    {menu && <div className="absolute z-50 w-56 overflow-hidden rounded-xl border border-border bg-surface text-xs shadow-2xl" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
+      <div className="border-b border-border bg-white/[0.02] px-3 py-2 font-medium text-gray-100">{menu.node.displayName}</div>
+      <div className="grid grid-cols-2 gap-px bg-border bg-opacity-50">
+        {([['details','Details'],['profile','Profile'],['center','Center'],['expand','Expand'],['collapse','Collapse'],['hide','Hide'],['pin','Pin'],['dependencies','Deps']] as [GraphContextAction,string][]).map(([value, label]) => (
+          <button key={value} className="bg-surface px-2 py-1.5 text-left text-gray-400 transition hover:bg-white/5 hover:text-gray-200" onClick={() => action(value)}>{label}</button>
+        ))}
+      </div>
+      <div className="border-t border-border"><button className="block w-full px-3 py-1.5 text-left text-gray-400 transition hover:bg-white/5 hover:text-gray-200" onClick={() => action('paths-from')}>Find paths from</button><button className="block w-full px-3 py-1.5 text-left text-gray-400 transition hover:bg-white/5 hover:text-gray-200" onClick={() => action('paths-to')}>Find paths to</button></div>
+      <div className="border-t border-border"><button className="block w-full px-3 py-1.5 text-left text-orange-400 transition hover:bg-orange-500/10" onClick={() => action('privileged-reachability')}>Privileged reachability</button><button className="block w-full px-3 py-1.5 text-left text-orange-400 transition hover:bg-orange-500/10" onClick={() => action('attack-workspace')}>Attack path workspace</button></div>
+      <div className="border-t border-border bg-white/[0.02] p-2"><div className="mb-1 text-[10px] text-gray-500">Expand</div><div className="flex items-center gap-1"><select value={direction} onChange={(event) => setDirection(event.target.value as typeof direction)} className="min-w-0 flex-1 rounded border border-border bg-card px-1 py-1 text-[10px]"><option value="both">Both</option><option value="incoming">In</option><option value="outgoing">Out</option></select><select value={depth} onChange={(event) => setDepth(Number(event.target.value))} className="rounded border border-border bg-card px-1 py-1 text-[10px]">{[1,2,3,4,5].map((d) => <option key={d}>{d}</option>)}</select><button className="rounded bg-primary px-2 py-1 text-[10px] text-white transition hover:bg-primary-hover" onClick={() => action('expand')}>Go</button></div></div>
     </div>}
   </div>
 })

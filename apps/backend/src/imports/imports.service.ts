@@ -14,6 +14,7 @@ import type { CorrelationResult } from './correlation'
 import type { ConversionResult } from './graph-conversion'
 
 const UPLOAD_DIR = IMPORT_CONFIG.uploadDir
+const STATE_DIR = path.join(UPLOAD_DIR, '.state')
 
 function isAllowed(filename: string): boolean {
   const ext = path.extname(filename).toLowerCase()
@@ -43,6 +44,8 @@ export class ImportsService {
     if (!fs.existsSync(UPLOAD_DIR)) {
       fs.mkdirSync(UPLOAD_DIR, { recursive: true })
     }
+    if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true })
+    if (process.env.NODE_ENV !== 'test') this.restoreSnapshots()
     this.logger.log(`Upload directory: ${UPLOAD_DIR}`)
     this.logger.log(`Max file size: ${IMPORT_CONFIG.maxFileSizeBytes / 1024 / 1024}MB`)
     this.logger.log(`Max rows per sheet: ${IMPORT_CONFIG.maxRowsPerSheet}`)
@@ -164,6 +167,7 @@ export class ImportsService {
     }
 
     this.sessions.set(importId, session)
+    this.persistSnapshot(importId)
     this.scheduleCleanup(importId)
 
     return session
@@ -171,6 +175,10 @@ export class ImportsService {
 
   getSession(importId: string): ImportSession | undefined {
     return this.sessions.get(importId)
+  }
+
+  getLatestSession(): ImportSession | undefined {
+    return [...this.sessions.values()].sort((a, b) => b.createdAt - a.createdAt)[0]
   }
 
   getProgress(importId: string): SessionProgress | null {
@@ -302,6 +310,7 @@ export class ImportsService {
       (item) => item.fileId !== result.fileId || item.sheetIndex !== result.sheetIndex,
     )
     this.validationCache.set(importId, [...results, result])
+    this.persistSnapshot(importId)
   }
 
   invalidateValidationResult(importId: string, fileId: string, sheetIndex: number): void {
@@ -319,6 +328,7 @@ export class ImportsService {
   setCorrelationResult(importId: string, result: CorrelationResult): void {
     this.correlationCache.set(importId, result)
     this.conversionCache.delete(importId)
+    this.persistSnapshot(importId)
   }
 
   getCorrelationResult(importId: string): CorrelationResult | undefined {
@@ -327,6 +337,7 @@ export class ImportsService {
 
   setConversionResult(importId: string, result: ConversionResult): void {
     this.conversionCache.set(importId, result)
+    this.persistSnapshot(importId)
   }
 
   getConversionResult(importId: string): ConversionResult | undefined {
@@ -351,6 +362,58 @@ export class ImportsService {
     const session = this.sessions.get(importId)
     if (!session) return
     session.progress = { ...session.progress!, ...update }
+    this.persistSnapshot(importId)
+  }
+
+  private snapshotPath(importId: string): string {
+    return path.join(STATE_DIR, `${importId}.json`)
+  }
+
+  private persistSnapshot(importId: string): void {
+    const session = this.sessions.get(importId)
+    if (!session) return
+    const mappings = [...this.mappingCache.entries()].filter(([key]) => key.startsWith(`${importId}:`))
+    const payload = {
+      version: 1,
+      session,
+      validation: this.validationCache.get(importId) ?? [],
+      mappings,
+      correlation: this.correlationCache.get(importId) ?? null,
+      conversion: this.conversionCache.get(importId) ?? null,
+      cancelled: this.cancelledSessions.has(importId),
+    }
+    const target = this.snapshotPath(importId)
+    const temp = `${target}.tmp`
+    try {
+      fs.writeFileSync(temp, JSON.stringify(payload))
+      fs.renameSync(temp, target)
+    } catch (error) {
+      this.logger.warn(`Could not persist import snapshot ${importId}: ${(error as Error).message}`)
+      if (fs.existsSync(temp)) fs.unlinkSync(temp)
+    }
+  }
+
+  private restoreSnapshots(): void {
+    for (const name of fs.readdirSync(STATE_DIR).filter((item) => item.endsWith('.json'))) {
+      try {
+        const payload = JSON.parse(fs.readFileSync(path.join(STATE_DIR, name), 'utf8'))
+        const session = payload.session as ImportSession
+        if (!session?.importId) continue
+        if (Date.now() - session.createdAt > IMPORT_CONFIG.sessionTtlMs) {
+          fs.unlinkSync(path.join(STATE_DIR, name))
+          continue
+        }
+        this.sessions.set(session.importId, session)
+        if (Array.isArray(payload.validation)) this.validationCache.set(session.importId, payload.validation)
+        if (Array.isArray(payload.mappings)) for (const [key, value] of payload.mappings) this.mappingCache.set(key, value)
+        if (payload.correlation) this.correlationCache.set(session.importId, payload.correlation)
+        if (payload.conversion) this.conversionCache.set(session.importId, payload.conversion)
+        if (payload.cancelled) this.cancelledSessions.add(session.importId)
+        this.scheduleCleanup(session.importId)
+      } catch (error) {
+        this.logger.warn(`Ignoring invalid import snapshot ${name}: ${(error as Error).message}`)
+      }
+    }
   }
 
   private scheduleCleanup(importId: string): void {

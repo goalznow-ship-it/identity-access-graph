@@ -199,6 +199,8 @@ export interface ImportGraphPreview {
   pagination: { nodeLimit: number; relationshipLimit: number; totalNodes: number; totalRelationships: number; truncated: boolean }
 }
 export interface ImportPersistenceSummary {
+  storageMode?: 'neo4j' | 'import-session'
+  warning?: string
   nodesUpserted: number
   relationshipsUpserted: number
   skipped: number

@@ -8,7 +8,8 @@ function value(record: any, key: string) { const item = record.get(key); return 
 @Injectable()
 export class GraphService {
   constructor(@Inject(GRAPH_REPOSITORY) private readonly repository: GraphRepository, private readonly neo4j: Neo4jService) {}
-  private available() { if (!this.neo4j.isEnabled()) throw new ServiceUnavailableException('Graph persistence is disabled') }
+  isPersistenceEnabled() { return this.neo4j.isEnabled() }
+  private available() { if (!this.neo4j.isEnabled()) throw new ServiceUnavailableException('Neo4j is disabled. Use imported-session mode or enable Neo4j in .env.') }
   getNodeById(id: string) { this.available(); return this.repository.getNodeById(id) }
   getNeighbors(id: string, options?: NeighborOptions, depth = 1) { this.available(); return depth > 1 ? this.repository.getSubgraph([id], { depth: Math.min(Math.max(Math.trunc(depth), 1), 3), limit: options?.limit }) : this.repository.getNeighbors(id, options) }
   searchNodes(query: string, options?: SearchOptions) { this.available(); return this.repository.searchNodes(query, options) }

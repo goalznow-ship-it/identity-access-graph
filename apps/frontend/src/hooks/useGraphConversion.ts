@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { convertImport } from '../services/importApi'
+import { convertImport, getConversionSummary, getImportGraphPreview } from '../services/importApi'
 import type { ConversionResult } from '../types/import'
 
 export function useGraphConversion() {
@@ -12,5 +12,14 @@ export function useGraphConversion() {
     catch (cause) { const message = cause instanceof Error ? cause.message : 'Conversion failed'; setError(message); throw cause }
     finally { setLoading(false) }
   }
-  return { result, loading, error, convert }
+  const restore = async (importId: string) => {
+    setLoading(true); setError(null)
+    try {
+      const [summary, preview] = await Promise.all([getConversionSummary(importId), getImportGraphPreview(importId)])
+      const value = { ...summary, preview } as ConversionResult
+      setResult(value)
+      return value
+    } finally { setLoading(false) }
+  }
+  return { result, loading, error, convert, restore, setResult }
 }

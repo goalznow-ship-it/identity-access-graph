@@ -1,4 +1,15 @@
 {
+  "name": "identity-access-graph",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm --prefix packages/graph-model install && npm --prefix packages/shared-types install && npm --prefix packages/mock-data install --workspaces=false && npm --prefix apps/backend install && npm --prefix apps/frontend install",
+    "dev:backend": "npm --prefix apps/backend run start:dev",
+    "dev:frontend": "npm --prefix apps/frontend run dev",
+    "build": "npm --prefix apps/backend run build && npm --prefix apps/frontend run build",
+    "test": "npm --prefix apps/backend run test && npm --prefix apps/frontend run test",
+    "check": "npm run build && npm run test",
+    "verify": "npm run check"
+  },
   "dependencies": {
     "ts-node": "^10.9.2",
     "tsx": "^4.23.1"

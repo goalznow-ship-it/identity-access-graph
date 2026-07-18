@@ -33,7 +33,8 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
       const completed: ImportPersistenceSummary = { ...result, switchedToNeo4j: switchSource, keptSession: keepSession }
       setSummary(completed)
 
-      if (runScan) {
+      const durableNeo4j = result.storageMode !== 'import-session'
+      if (runScan && durableNeo4j) {
         setScanning(true)
         try {
           const scan = await runRiskScan('neo4j')
@@ -46,10 +47,10 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
           setScanning(false)
         }
       }
-      if (switchSource) {
-        localStorage.setItem('iag-graph-source', 'neo4j')
-        window.dispatchEvent(new CustomEvent('iag-graph-source-change', { detail: 'neo4j' }))
-      }
+      const nextSource = durableNeo4j && switchSource ? 'neo4j' : 'imported'
+      localStorage.setItem('lastImportId', importId)
+      localStorage.setItem('iag-graph-source', nextSource)
+      window.dispatchEvent(new CustomEvent('iag-graph-source-change', { detail: nextSource }))
       if (keepSession) localStorage.setItem('lastImportId', importId)
       else localStorage.removeItem('iag-active-import')
       onPersisted(completed)
@@ -68,7 +69,7 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
       </div>
 
       <p className="text-xs text-gray-500">
-        Save the converted graph data to Neo4j. A risk scan will run automatically after persistence.
+        Save to Neo4j when configured. Otherwise the imported graph remains active in session mode without returning a 503 error.
       </p>
 
       {error && (
@@ -82,7 +83,7 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-green-400">
             <CheckCircle className="h-5 w-5" />
-            <span className="text-sm font-medium">Graph persisted successfully</span>
+            <span className="text-sm font-medium">{summary.storageMode === 'neo4j' ? 'Graph persisted to Neo4j' : 'Import session activated'}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -103,6 +104,8 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
               <div className="text-[10px] text-gray-500 uppercase">Conflicts</div>
             </div>
           </div>
+
+          {summary.warning && <div className="rounded border border-yellow-700 bg-yellow-900/20 p-2 text-xs text-yellow-300">{summary.warning}</div>}
 
           <div className="text-xs text-gray-500">
             Duration: {(summary.durationMs / 1000).toFixed(1)}s
@@ -140,7 +143,7 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
           </div>
           <Button onClick={handlePersist} disabled={persisting || !confirmed} className="inline-flex items-center gap-2">
             {persisting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
-            {persisting ? (scanning ? 'Running risk scan...' : 'Persisting...') : 'Persist to Neo4j'}
+            {persisting ? (scanning ? 'Running risk scan...' : 'Persisting...') : 'Finish Import'}
           </Button>
         </div>
       )}

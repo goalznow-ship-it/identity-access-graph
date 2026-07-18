@@ -20,8 +20,10 @@ export class ReferenceResolver {
     this.index.get(key)!.add(nodeId)
   }
 
-  resolve(value: unknown): string | undefined {
+  resolve(value: unknown, excludeNodeId?: string): string | undefined {
     const matches = this.index.get(String(value ?? '').trim().toLowerCase())
-    return matches?.size === 1 ? [...matches][0] : undefined
+    if (!matches) return undefined
+    const candidates = [...matches].filter((nodeId) => nodeId !== excludeNodeId)
+    return candidates.length === 1 ? candidates[0] : undefined
   }
 }
