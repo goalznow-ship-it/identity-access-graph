@@ -1,19 +1,33 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backend = 'http://localhost:3000'
+
+const passThrough = (...roots: string[]) => ({
+  target: backend,
+  bypass: (req: { url?: string }) => {
+    if (roots.includes(req.url ?? '')) return '/index.html'
+  },
+})
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/imports': 'http://localhost:3000',
-      '/graph': 'http://localhost:3000',
-      '/risk': 'http://localhost:3000',
-      '/attack-path': 'http://localhost:3000',
-      '/attack-paths': 'http://localhost:3000',
-      '/connectors': 'http://localhost:3000',
-      '/identity': 'http://localhost:3000',
-      '/pipeline': 'http://localhost:3000',
-      '/health': 'http://localhost:3000',
+      '/graph/nodes':              backend,
+      '/graph/search':             backend,
+      '/graph/subgraph':           backend,
+      '/graph/dashboard-summary':  backend,
+      '/graph/stats':              backend,
+      '/graph/relationships':      backend,
+      '/imports':      passThrough('/imports'),
+      '/risk':         passThrough('/risk'),
+      '/attack-paths': passThrough('/attack-paths'),
+      '/attack-path':  backend,
+      '/connectors':   passThrough('/connectors'),
+      '/identity':     backend,
+      '/pipeline':     backend,
+      '/health':       backend,
     },
   },
 })
