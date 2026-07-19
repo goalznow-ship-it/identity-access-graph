@@ -7,9 +7,10 @@ import { IdentityCorrelationService } from './correlation'
 import { GraphConversionService } from './graph-conversion'
 import { GraphModule } from '../graph'
 import { ImportGraphPersistenceService } from './import-graph-persistence.service'
+import { RiskModule } from '../risk'
 
 @Module({
-  imports: [GraphModule],
+  imports: [GraphModule, RiskModule],
   controllers: [ImportsController],
   providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],
   exports: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],

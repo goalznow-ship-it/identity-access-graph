@@ -34,10 +34,10 @@ export function PersistImportPanel({ importId, onPersisted }: PersistImportPanel
       setSummary(completed)
 
       const durableNeo4j = result.storageMode !== 'import-session'
-      if (runScan && durableNeo4j) {
+      if (runScan) {
         setScanning(true)
         try {
-          const scan = await runRiskScan('neo4j')
+          const scan = await runRiskScan(durableNeo4j ? 'neo4j' : 'memory')
           setScanResult(scan)
           completed.riskResult = scan
         } catch {

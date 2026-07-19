@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { GraphService } from '../graph'
 import type { PersistedGraphNode, PersistedGraphRelationship } from '../graph'
 import { ImportsService } from './imports.service'
+import { RiskGraphSourceService } from '../risk'
 
 export interface ImportPersistenceSummary {
   nodesUpserted: number
@@ -20,7 +21,11 @@ export interface ImportGraphPersistence {
 
 @Injectable()
 export class ImportGraphPersistenceService implements ImportGraphPersistence {
-  constructor(private readonly imports: ImportsService, private readonly graph: GraphService) {}
+  constructor(
+    private readonly imports: ImportsService,
+    private readonly graph: GraphService,
+    @Optional() private readonly riskSource?: RiskGraphSourceService,
+  ) {}
 
   persistConvertedGraph(importId: string) { return this.persist(importId) }
   persistGraphPreview(importId: string) { return this.persist(importId) }
@@ -29,6 +34,8 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     const started = Date.now()
     const conversion = this.imports.getConversionResult(importId)
     if (!conversion) throw new NotFoundException('Graph conversion has not been run')
+    const completeGraph = conversion.fullGraph ?? conversion.preview
+    this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
 
     const persistenceEnabled = typeof (this.graph as any).isPersistenceEnabled === 'function' ? (this.graph as any).isPersistenceEnabled() : true
     if (!persistenceEnabled) {
@@ -43,9 +50,8 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
       }
     }
 
-    const graph = conversion.fullGraph ?? conversion.preview
-    const nodes = graph.nodes as PersistedGraphNode[]
-    const relationships = graph.links as PersistedGraphRelationship[]
+    const nodes = completeGraph.nodes as PersistedGraphNode[]
+    const relationships = completeGraph.links as PersistedGraphRelationship[]
     const nodeSummary = await this.graph.upsertNodes(nodes)
     const relationshipSummary = await this.graph.upsertRelationships(relationships)
     return {
