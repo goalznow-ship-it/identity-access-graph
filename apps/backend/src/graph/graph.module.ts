@@ -1,2 +1,2 @@
-import { Module } from '@nestjs/common'; import { GraphController } from './graph.controller'; import { GraphService } from './graph.service'; import { GRAPH_REPOSITORY,Neo4jGraphRepository } from './repositories'
-@Module({controllers:[GraphController],providers:[GraphService,Neo4jGraphRepository,{provide:GRAPH_REPOSITORY,useExisting:Neo4jGraphRepository}],exports:[GraphService,GRAPH_REPOSITORY]}) export class GraphModule{}
+import { Module } from '@nestjs/common'; import { GraphController } from './graph.controller'; import { GraphService } from './graph.service'; import { GRAPH_REPOSITORY,Neo4jGraphRepository } from './repositories'; import { EnterpriseGraphService } from './enterprise-graph.service'
+@Module({controllers:[GraphController],providers:[GraphService,EnterpriseGraphService,Neo4jGraphRepository,{provide:GRAPH_REPOSITORY,useExisting:Neo4jGraphRepository}],exports:[GraphService,EnterpriseGraphService,GRAPH_REPOSITORY]}) export class GraphModule{}
