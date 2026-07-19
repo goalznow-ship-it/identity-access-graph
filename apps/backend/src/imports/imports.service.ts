@@ -15,6 +15,8 @@ import type { ConversionResult } from './graph-conversion'
 import { OperationalStoreService } from '../database/operational-store.service'
 import type { ImportJobEntity } from '../database/entities'
 import { ImportQueueService } from './import-queue.service'
+import { ImportChunkService } from './import-chunk.service'
+import { parseCsvChunked, parseExcelChunked } from './parsers/chunked-parser'
 
 const UPLOAD_DIR = IMPORT_CONFIG.uploadDir
 const STATE_DIR = path.join(UPLOAD_DIR, '.state')
@@ -44,7 +46,7 @@ export class ImportsService implements OnModuleInit {
     return `${importId}:${fileId}:${sheetIndex}`
   }
 
-  constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly queue?: ImportQueueService) {
+  constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly queue?: ImportQueueService, @Optional() private readonly chunks?: ImportChunkService) {
     if (!fs.existsSync(UPLOAD_DIR)) {
       fs.mkdirSync(UPLOAD_DIR, { recursive: true })
     }
@@ -304,7 +306,18 @@ export class ImportsService implements OnModuleInit {
     if (!session || !file) throw new Error('Import session or file is no longer available.')
     if (session.cancelled || this.cancelledSessions.has(job.importId)) throw new Error('Import was cancelled.')
     await saveCheckpoint({ phase: 'parsing', fileId: file.id, rowsProcessed: file.progress?.rowsProcessed ?? 0 })
-    if (file.status === 'uploaded' || file.status === 'error') {
+    const ext = path.extname(file.originalName).toLowerCase()
+    if (this.chunks && file.filePath && ['.csv', '.xlsx', '.xls'].includes(ext)) {
+      const callbacks = {
+        resumeRows: Number(job.checkpoint.rowsProcessed ?? 0),
+        onChunk: (sheetIndex: number, chunkIndex: number, rowStart: number, rows: Record<string, unknown>[]) => this.chunks!.append(job.importId, job.fileId, sheetIndex, chunkIndex, rowStart, rows),
+        onProgress: saveCheckpoint,
+        isCancelled: () => Boolean(session.cancelled || this.cancelledSessions.has(job.importId)),
+      }
+      const parsed = ext === '.csv' ? [await parseCsvChunked(file.filePath, file.originalName.replace(ext, ''), callbacks)] : await parseExcelChunked(file.filePath, callbacks)
+      file.sheets = parsed.map(({ allRows: _rows, ...sheet }) => { const result = classify(sheet.headers); return { ...sheet, classification: result.type, classificationConfidence: result.confidence } })
+      file.status = 'inspected'; file.error = undefined
+    } else if (file.status === 'uploaded' || file.status === 'error') {
       file.status = 'error'
       const retried = await this.retryFile(job.importId, job.fileId, true)
       if (!retried || retried.files.find((item) => item.id === job.fileId)?.status === 'error') throw new Error(file.error ?? 'File processing failed.')
@@ -336,6 +349,7 @@ export class ImportsService implements OnModuleInit {
       this.fullRowsCache.delete(this.sheetKey(importId, fileId, si))
     }
     this.invalidateAllDerived(importId)
+    void this.chunks?.deleteFile(importId, fileId)
     this.persistSnapshot(importId)
 
     return session
@@ -356,6 +370,10 @@ export class ImportsService implements OnModuleInit {
     const key = this.sheetKey(importId, fileId, sheetIndex)
     const cached = this.fullRowsCache.get(key)
     if (cached) return cached
+    if (this.chunks) {
+      const rows = await this.chunks.rows(importId, fileId, sheetIndex)
+      if (rows.length) return rows
+    }
     const session = this.sessions.get(importId)
     const file = session?.files.find((item) => item.id === fileId)
     if (!file?.filePath || !fs.existsSync(file.filePath)) return file?.sheets[sheetIndex]?.previewRows ?? []
