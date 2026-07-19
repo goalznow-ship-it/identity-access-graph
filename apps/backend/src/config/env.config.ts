@@ -15,4 +15,7 @@ export default () => ({
   pipeline: {
     allowDemoData: (process.env.PIPELINE_ALLOW_DEMO_DATA ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')).toLowerCase() === 'true',
   },
+  risk: {
+    allowDemoData: (process.env.RISK_ALLOW_DEMO_DATA ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')).toLowerCase() === 'true',
+  },
 })

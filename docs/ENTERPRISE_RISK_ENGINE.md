@@ -2,6 +2,8 @@
 
 The risk engine evaluates the current graph using deterministic rules and persists both findings and scan history in PostgreSQL. Neo4j is used when `graphSource` is `neo4j` (or when `auto` selects it); memory mode remains available for previews and tests.
 
+Production analysis fails closed when neither Neo4j nor a durable imported graph snapshot is available. Bundled demonstration data is never selected implicitly in production. `RISK_ALLOW_DEMO_DATA=true` is an explicit development-only compatibility option and defaults to false when `NODE_ENV=production`.
+
 ## Finding lifecycle
 
 - Finding IDs are stable across scans for the same rule, nodes, and relationships.
