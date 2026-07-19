@@ -4,10 +4,11 @@ import type { GraphSourceMode } from '../types/neo4j'
 import { buildGraphData } from '../services/graphDataAdapter'
 import { getActiveImportGraphPreview, getImportGraphPreview, ImportApiError } from '../services/importApi'
 import { useNeo4jGraph } from './useNeo4jGraph'
+import { DEMO_DATA_ENABLED } from '../services/runtimeConfig'
 
 export function useGraphData(importId?:string|null,source:GraphSourceMode=importId?'imported':'neo4j',filters:Record<string,unknown>={}){
   const neo4j=useNeo4jGraph(source==='neo4j',filters)
-  const[data,setData]=useState<GraphData|null>(source==='mock'?buildGraphData():null)
+  const[data,setData]=useState<GraphData|null>(source==='mock'&&DEMO_DATA_ENABLED?buildGraphData():null)
   const[loading,setLoading]=useState(source!=='mock'&&source!=='neo4j')
   const[error,setError]=useState<string|null>(null)
   const[fallbackNotice,setFallbackNotice]=useState<string|null>(null)
@@ -16,7 +17,7 @@ export function useGraphData(importId?:string|null,source:GraphSourceMode=import
   useEffect(()=>{
     if(source==='neo4j')return
     if(source==='mock'){
-      setData(buildGraphData());setLoading(false);setError(null);setFallbackNotice(null);return
+      setData(DEMO_DATA_ENABLED?buildGraphData():null);setLoading(false);setError(DEMO_DATA_ENABLED?null:'Demonstration data is disabled for this deployment.');setFallbackNotice(null);return
     }
     let cancelled=false
     setLoading(true);setError(null);setFallbackNotice(null)
@@ -36,7 +37,7 @@ export function useGraphData(importId?:string|null,source:GraphSourceMode=import
       }catch(error){
         if(cancelled)return
         setData(null)
-        if(error instanceof ImportApiError&&error.status===404)setError('No active imported dataset is available. Create a new import or switch to Mock Enterprise.')
+        if(error instanceof ImportApiError&&error.status===404)setError(`No active imported dataset is available. Create a new import${DEMO_DATA_ENABLED?' or switch to Mock Enterprise':''}.`)
         else setError((error as Error).message)
       }finally{if(!cancelled)setLoading(false)}
     }

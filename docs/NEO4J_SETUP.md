@@ -1,6 +1,8 @@
 # Neo4j backend setup
 
-Neo4j persistence is optional and disabled by default. Existing mock graph and in-memory import preview flows continue to work with `NEO4J_ENABLED=false`.
+Neo4j is the authoritative production graph database. Imported PostgreSQL-backed graph snapshots remain available for staged ingestion and recovery workflows when live Neo4j is unavailable.
+
+Production frontend builds expose only Neo4j and imported graph sources. The bundled demonstration dataset can be enabled deliberately for training or evaluation builds with `VITE_DEMO_DATA_ENABLED=true`; this is a Vite build-time setting and must remain disabled in production.
 
 ## Local Docker Compose
 

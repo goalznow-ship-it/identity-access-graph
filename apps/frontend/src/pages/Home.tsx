@@ -12,6 +12,7 @@ import type { RiskSummary } from '../types/risk'
 import type { AttackPath,AttackSummary } from '../types/attackPath'
 import { loadSettings } from '../services/navigation'
 import { getActiveImportSession } from '../services/importApi'
+import { DEMO_DATA_ENABLED } from '../services/runtimeConfig'
 
 function Content({revision,onRefresh,refreshing}:{revision:number;onRefresh:()=>void;refreshing:boolean}){
   const {source,setSource}=useGraphSource()
@@ -28,7 +29,7 @@ function Content({revision,onRefresh,refreshing}:{revision:number;onRefresh:()=>
   useEffect(()=>{const controller=new AbortController();void getRiskSummary().then(setRiskSummary).catch(()=>setRiskSummary(null));return()=>controller.abort()},[revision])
   useEffect(()=>{void getAttackDashboard().then(([nextSummary,top])=>{setAttackSummary(nextSummary);setTopPaths(top)}).catch(()=>setAttackSummary(null))},[revision])
   useEffect(()=>{if(source!=='neo4j'){setSummary(null);setSummaryError(null);return}const controller=new AbortController();void getDashboardSummary({}, {signal:controller.signal,timeoutMs:loadSettings(localStorage).apiTimeoutMs}).then(setSummary).catch((nextError)=>setSummaryError((nextError as Error).message));return()=>controller.abort()},[source,revision])
-  useEffect(()=>{const failure=error||summaryError;if(source==='neo4j'&&failure&&loadSettings(localStorage).autoFallback){setNotice(`Neo4j Live unavailable: ${failure}. Switched to Mock Enterprise.`);setSource('mock')}},[source,error,summaryError,setSource])
+  useEffect(()=>{const failure=error||summaryError;if(DEMO_DATA_ENABLED&&source==='neo4j'&&failure&&loadSettings(localStorage).autoFallback){setNotice(`Neo4j Live unavailable: ${failure}. Switched to Mock Enterprise.`);setSource('mock')}},[source,error,summaryError,setSource])
   if(loading||(source==='neo4j'&&!summary&&!summaryError))return <DashboardSkeleton/>
   if(error||!data||summaryError)return <DashboardEmpty onRetry={()=>{void retry();onRefresh()}}/>
   const dashboardSummary=riskSummary?({...summary,riskCounts:riskSummary.countsBySeverity}as DashboardSummary):summary
