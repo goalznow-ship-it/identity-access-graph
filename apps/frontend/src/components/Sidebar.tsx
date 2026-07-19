@@ -16,12 +16,15 @@ import {
 } from '../components/icons'
 import { Tooltip } from './ui/Tooltip'
 import { useState } from 'react'
+import { useAuth } from '../auth/AuthContext'
+import { hasMinimumRole, type PlatformRole } from '../services/authApi'
 
 interface MenuItem {
   label: string
   icon: LucideIcon
   path: string
   children?: { label: string; path: string }[]
+  minimumRole?: PlatformRole
 }
 
 interface MenuGroup {
@@ -34,14 +37,14 @@ const menuGroups: MenuGroup[] = [
     group: 'Main',
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-      { label: 'Risk Findings', icon: Shield, path: '/risk' },
-      { label: 'Attack Paths', icon: Share2, path: '/attack-paths' },
-      { label: 'Connectors', icon: Upload, path: '/connectors' },
+      { label: 'Risk Findings', icon: Shield, path: '/risk', minimumRole: 'ANALYST' },
+      { label: 'Attack Paths', icon: Share2, path: '/attack-paths', minimumRole: 'ANALYST' },
+      { label: 'Connectors', icon: Upload, path: '/connectors', minimumRole: 'ADMIN' },
       { label: 'Graph', icon: Share2, path: '/graph' },
-      { label: 'Pipeline', icon: GitBranch, path: '/pipeline' },
+      { label: 'Pipeline', icon: GitBranch, path: '/pipeline', minimumRole: 'ADMIN' },
       { label: 'Linux Admin', icon: Terminal, path: '/linux-admin' },
       { label: 'Business Questions', icon: HelpCircle, path: '/business-questions' },
-      { label: 'Imports', icon: Upload, path: '/imports' },
+      { label: 'Imports', icon: Upload, path: '/imports', minimumRole: 'ADMIN' },
     ],
   },
   {
@@ -70,7 +73,7 @@ const menuGroups: MenuGroup[] = [
   },
   {
     group: 'System',
-    items: [{ label: 'Settings', icon: Settings, path: '/settings' }],
+    items: [{ label: 'Settings', icon: Settings, path: '/settings', minimumRole: 'ADMIN' }],
   },
 ]
 
@@ -80,6 +83,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const { user } = useAuth()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
@@ -127,7 +131,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               </p>
             )}
             <div className="space-y-0.5">
-              {group.items.map((item) => {
+              {group.items.filter(item => !item.minimumRole || hasMinimumRole(user?.role, item.minimumRole)).map((item) => {
                 const Icon = item.icon
                 const active = isActiveParent(item)
                 const hasChildren = !!item.children?.length

@@ -80,7 +80,7 @@ export function ImportComplete({ importId, persistenceSummary, session, correlat
           Risk Findings
         </Button>
         <Button variant="ghost" onClick={() => window.open('/', '_blank')}>Dashboard</Button>
-        <Button variant="ghost" onClick={() => window.open('/enterprise-identities', '_blank')}>Enterprise Identities</Button>
+        <Button variant="ghost" onClick={() => window.open('/enterprise-identity', '_blank')}>Enterprise Identities</Button>
         <Button variant="secondary" onClick={downloadReport}><Download className="h-4 w-4" />Download Import Report</Button>
         <Button variant="danger" onClick={onNewImport}>Start New Import</Button>
       </div>
