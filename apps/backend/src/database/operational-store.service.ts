@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { EntityManager, Repository } from 'typeorm'
-import { AttackPathEntity, EnterpriseIdentityEntity, GraphSnapshotEntity, ImportSessionEntity, OperationalMetadataEntity, PipelineRunEntity, RiskFindingEntity } from './entities'
+import { AttackPathEntity, EnterpriseIdentityEntity, GraphSnapshotEntity, ImportSessionEntity, OperationalMetadataEntity, PipelineRunEntity, RiskFindingEntity, RiskScanRunEntity } from './entities'
 
 @Injectable()
 export class OperationalStoreService {
@@ -12,6 +12,7 @@ export class OperationalStoreService {
     @InjectRepository(ImportSessionEntity) private imports: Repository<ImportSessionEntity>,
     @InjectRepository(GraphSnapshotEntity) private graphs: Repository<GraphSnapshotEntity>,
     @InjectRepository(RiskFindingEntity) private findings: Repository<RiskFindingEntity>,
+    @InjectRepository(RiskScanRunEntity) private riskScans: Repository<RiskScanRunEntity>,
     @InjectRepository(AttackPathEntity) private paths: Repository<AttackPathEntity>,
     @InjectRepository(EnterpriseIdentityEntity) private identities: Repository<EnterpriseIdentityEntity>,
     @InjectRepository(PipelineRunEntity) private pipelines: Repository<PipelineRunEntity>,
@@ -25,6 +26,8 @@ export class OperationalStoreService {
   saveGraph(id: string, payload: Record<string, unknown>) { this.track(this.graphs.save({ id, payload })); }
   loadFindings() { return this.findings.find() }
   saveFinding(row: Partial<RiskFindingEntity> & Pick<RiskFindingEntity, 'id'>) { this.track(this.findings.save(row)); }
+  loadRiskScans(limit = 50) { return this.riskScans.find({ order: { startedAt: 'DESC' }, take: Math.min(200, Math.max(1, limit)) }) }
+  saveRiskScan(row: Partial<RiskScanRunEntity> & Pick<RiskScanRunEntity, 'id'>) { this.track(this.riskScans.save(row)); }
   loadPaths() { return this.paths.find() }
   replacePaths(rows: AttackPathEntity[]) {
     this.track(this.paths.manager.transaction(async (manager) => {

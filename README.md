@@ -22,3 +22,5 @@ PostgreSQL is required for backend runtime state. See [docs/POSTGRESQL.md](docs/
 The production import queue and reporting APIs are documented in [docs/ENTERPRISE_IMPORT_ENGINE.md](docs/ENTERPRISE_IMPORT_ENGINE.md).
 
 Neo4j graph versioning, snapshots, traversal, indexes, and operational commands are documented in [docs/ENTERPRISE_GRAPH_ENGINE.md](docs/ENTERPRISE_GRAPH_ENGINE.md).
+
+Durable risk scan history and finding lifecycle reconciliation are documented in [docs/ENTERPRISE_RISK_ENGINE.md](docs/ENTERPRISE_RISK_ENGINE.md).

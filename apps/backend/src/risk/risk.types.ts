@@ -11,3 +11,4 @@ export interface RuleMatch { nodes:string[];relationships?:string[];path?:string
 export interface RiskRule { id:string;title:string;category:FindingCategory;defaultSeverity:FindingSeverity;remediation:string;detect(graph:GraphSnapshot,maxDepth:number):RuleMatch[] }
 export interface FindingFilters {severity?:FindingSeverity;category?:FindingCategory;status?:FindingStatus;sourceSystem?:string;nodeId?:string;ruleId?:string;limit?:number;offset?:number}
 export interface RiskScanRequest {ruleIds?:string[];graphSource?:'auto'|'neo4j'|'memory';maxDepth?:number}
+export interface RiskScanRun {id:string;status:'RUNNING'|'COMPLETED'|'FAILED';graphSource:'auto'|'neo4j'|'memory';ruleIds:string[];rulesRun:number;findingsDetected:number;findingsResolved:number;durationMs?:number;error?:string;startedAt:string;completedAt?:string}

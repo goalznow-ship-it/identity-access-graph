@@ -20,10 +20,12 @@ import {
   OperationalMetadataEntity,
   PipelineRunEntity,
   RiskFindingEntity,
+  RiskScanRunEntity,
 } from '../entities'
 import { InitialOperationalPersistence1721380800000 } from '../migrations/1721380800000-InitialOperationalPersistence'
 import { EnterpriseImportEngine1721467200000 } from '../migrations/1721467200000-EnterpriseImportEngine'
 import { EnterpriseGraphEngine1721553600000 } from '../migrations/1721553600000-EnterpriseGraphEngine'
+import { EnterpriseRiskEngine1721640000000 } from '../migrations/1721640000000-EnterpriseRiskEngine'
 import { OperationalStoreService } from '../operational-store.service'
 import { ImportQueueService } from '../../imports/import-queue.service'
 import { ImportReportingService } from '../../imports/import-reporting.service'
@@ -55,7 +57,7 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
       type: 'postgres',
       url: databaseUrl,
       entities: DATABASE_ENTITIES,
-      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000],
+      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000],
       synchronize: false,
     })
     await dataSource.initialize()
@@ -65,6 +67,7 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
       dataSource.getRepository(ImportSessionEntity),
       dataSource.getRepository(GraphSnapshotEntity),
       dataSource.getRepository(RiskFindingEntity),
+      dataSource.getRepository(RiskScanRunEntity),
       dataSource.getRepository(AttackPathEntity),
       dataSource.getRepository(EnterpriseIdentityEntity),
       dataSource.getRepository(PipelineRunEntity),
@@ -78,12 +81,12 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
 
   it('runs the versioned migration once and supports rollback and re-apply', async () => {
     const firstRun = await dataSource.runMigrations({ transaction: 'all' })
-    assert.equal(firstRun.length, 3)
+    assert.equal(firstRun.length, 4)
     assert.equal(await dataSource.getRepository(ConnectorEntity).count(), 0)
     assert.equal((await dataSource.runMigrations({ transaction: 'all' })).length, 0)
 
     await dataSource.undoLastMigration({ transaction: 'all' })
-    const tableAfterRollback = await dataSource.query(`SELECT to_regclass('public.graph_versions') AS name`)
+    const tableAfterRollback = await dataSource.query(`SELECT to_regclass('public.risk_scan_runs') AS name`)
     assert.equal(tableAfterRollback[0].name, null)
     assert.equal((await dataSource.runMigrations({ transaction: 'all' })).length, 1)
   })

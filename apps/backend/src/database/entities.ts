@@ -55,6 +55,20 @@ export class RiskFindingEntity {
   @Column({ name: 'last_detected', type: 'timestamptz' }) lastDetected!: Date
 }
 
+@Entity('risk_scan_runs')
+export class RiskScanRunEntity {
+  @PrimaryColumn('uuid') id!: string
+  @Index() @Column({ type: 'varchar', length: 32 }) status!: string
+  @Column({ name: 'graph_source', type: 'varchar', length: 32 }) graphSource!: string
+  @Column({ name: 'rules_run', type: 'integer', default: 0 }) rulesRun!: number
+  @Column({ name: 'findings_detected', type: 'integer', default: 0 }) findingsDetected!: number
+  @Column({ name: 'findings_resolved', type: 'integer', default: 0 }) findingsResolved!: number
+  @Column({ name: 'duration_ms', type: 'integer', nullable: true }) durationMs!: number | null
+  @Column({ type: 'jsonb', default: {} }) payload!: Record<string, unknown>
+  @Column({ name: 'started_at', type: 'timestamptz' }) startedAt!: Date
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true }) completedAt!: Date | null
+}
+
 @Entity('attack_paths')
 export class AttackPathEntity {
   @PrimaryColumn({ type: 'varchar', length: 128 }) id!: string
@@ -166,4 +180,4 @@ export class GraphVersionEntity {
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true }) completedAt!: Date | null
 }
 
-export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, AttackPathEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity, GraphVersionEntity]
+export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, RiskScanRunEntity, AttackPathEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity, GraphVersionEntity]
