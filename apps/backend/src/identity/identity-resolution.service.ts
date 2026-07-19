@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common'
 import { deterministicId } from '../imports/graph-conversion/deterministic-id'
+import { OperationalStoreService } from '../database/operational-store.service'
 import {
   CONFIDENCE_THRESHOLD,
   toConfidenceLevel,
@@ -65,10 +66,18 @@ function extractSource(node: Record<string, unknown>): MergeSource {
 }
 
 @Injectable()
-export class IdentityResolutionService {
+export class IdentityResolutionService implements OnModuleInit {
   private readonly logger = new Logger(IdentityResolutionService.name)
 
   private enterpriseIdentities = new Map<string, EnterpriseIdentity>()
+
+  constructor(@Optional() private readonly store?: OperationalStoreService) {}
+
+  async onModuleInit() {
+    if (!this.store) return
+    const rows = await this.store.loadIdentities()
+    this.enterpriseIdentities = new Map(rows.map((row) => [row.id, row.payload as unknown as EnterpriseIdentity]))
+  }
 
   findCandidate(
     properties: Record<string, unknown>,
@@ -214,6 +223,7 @@ export class IdentityResolutionService {
       this.updateRoles(existingIdentity, props)
 
       this.enterpriseIdentities.set(existingIdentity.id, existingIdentity)
+      this.persist(existingIdentity)
       return existingIdentity
     }
 
@@ -267,6 +277,7 @@ export class IdentityResolutionService {
     this.updateGroups(identity, props)
     this.updateRoles(identity, props)
     this.enterpriseIdentities.set(id, identity)
+    this.persist(identity)
     return identity
   }
 
@@ -276,6 +287,10 @@ export class IdentityResolutionService {
 
   listEnterpriseIdentities(): EnterpriseIdentity[] {
     return Array.from(this.enterpriseIdentities.values())
+  }
+
+  private persist(identity: EnterpriseIdentity): void {
+    this.store?.saveIdentity({ id: identity.id, canonicalIdentityId: identity.canonicalIdentityId, payload: identity as unknown as Record<string, unknown>, createdAt: new Date(identity.createdAt), updatedAt: new Date(identity.updatedAt) })
   }
 
   private buildSource(source: MergeSource, nodeId: string, displayName: string, props: Record<string, unknown>, matchedFields: string[]): EnterpriseIdentitySource {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
@@ -12,6 +12,7 @@ import type { ValidationResult } from './validation/validation.service'
 import type { ColumnMapping } from './mapping/mapping.service'
 import type { CorrelationResult } from './correlation'
 import type { ConversionResult } from './graph-conversion'
+import { OperationalStoreService } from '../database/operational-store.service'
 
 const UPLOAD_DIR = IMPORT_CONFIG.uploadDir
 const STATE_DIR = path.join(UPLOAD_DIR, '.state')
@@ -26,7 +27,7 @@ function sanitizeName(filename: string): string {
 }
 
 @Injectable()
-export class ImportsService {
+export class ImportsService implements OnModuleInit {
   private readonly logger = new Logger(ImportsService.name)
   private sessions = new Map<string, ImportSession>()
   private validationCache = new Map<string, ValidationResult[]>()
@@ -41,16 +42,23 @@ export class ImportsService {
     return `${importId}:${fileId}:${sheetIndex}`
   }
 
-  constructor() {
+  constructor(@Optional() private readonly store?: OperationalStoreService) {
     if (!fs.existsSync(UPLOAD_DIR)) {
       fs.mkdirSync(UPLOAD_DIR, { recursive: true })
     }
     if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true })
-    if (process.env.NODE_ENV !== 'test') this.restoreSnapshots()
+    if (!this.store && process.env.NODE_ENV !== 'test') this.restoreSnapshots()
     this.logger.log(`Upload directory: ${UPLOAD_DIR}`)
     this.logger.log(`Max file size: ${IMPORT_CONFIG.maxFileSizeBytes / 1024 / 1024}MB`)
     this.logger.log(`Max rows per sheet: ${IMPORT_CONFIG.maxRowsPerSheet}`)
     this.logger.log(`Session TTL: ${IMPORT_CONFIG.sessionTtlMs / 60000}min`)
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (!this.store) return
+    for (const row of await this.store.loadImports()) {
+      this.restorePayload(row.payload)
+    }
   }
 
   getLimits(): ImportLimits {
@@ -415,7 +423,12 @@ export class ImportsService {
       mappings,
       correlation: this.correlationCache.get(importId) ?? null,
       conversion: this.conversionCache.get(importId) ?? null,
+      fullRows: [...this.fullRowsCache.entries()].filter(([key]) => key.startsWith(`${importId}:`)),
       cancelled: this.cancelledSessions.has(importId),
+    }
+    if (this.store) {
+      this.store.saveImport({ importId, status: session.progress?.status ?? 'completed', cancelled: payload.cancelled, payload, createdAt: new Date(session.createdAt), expiresAt: new Date(session.createdAt + IMPORT_CONFIG.sessionTtlMs) })
+      return
     }
     const target = this.snapshotPath(importId)
     const temp = `${target}.tmp`
@@ -443,17 +456,24 @@ export class ImportsService {
           fs.unlinkSync(path.join(STATE_DIR, name))
           continue
         }
-        this.sessions.set(session.importId, session)
-        if (Array.isArray(payload.validation)) this.validationCache.set(session.importId, payload.validation)
-        if (Array.isArray(payload.mappings)) for (const [key, value] of payload.mappings) this.mappingCache.set(key, value)
-        if (payload.correlation) this.correlationCache.set(session.importId, payload.correlation)
-        if (payload.conversion) this.conversionCache.set(session.importId, payload.conversion)
-        if (payload.cancelled) this.cancelledSessions.add(session.importId)
-        this.scheduleCleanup(session.importId, Math.max(0, IMPORT_CONFIG.sessionTtlMs - (Date.now() - session.createdAt)))
+        this.restorePayload(payload)
       } catch (error) {
         this.logger.warn(`Ignoring invalid import snapshot ${name}: ${(error as Error).message}`)
       }
     }
+  }
+
+  private restorePayload(payload: any): void {
+    const session = payload.session as ImportSession
+    if (!session?.importId || Date.now() - session.createdAt > IMPORT_CONFIG.sessionTtlMs) return
+    this.sessions.set(session.importId, session)
+    if (Array.isArray(payload.validation)) this.validationCache.set(session.importId, payload.validation)
+    if (Array.isArray(payload.mappings)) for (const [key, value] of payload.mappings) this.mappingCache.set(key, value)
+    if (payload.correlation) this.correlationCache.set(session.importId, payload.correlation)
+    if (payload.conversion) this.conversionCache.set(session.importId, payload.conversion)
+    if (Array.isArray(payload.fullRows)) for (const [key, value] of payload.fullRows) this.fullRowsCache.set(key, value)
+    if (payload.cancelled) this.cancelledSessions.add(session.importId)
+    this.scheduleCleanup(session.importId, Math.max(0, IMPORT_CONFIG.sessionTtlMs - (Date.now() - session.createdAt)))
   }
 
   private scheduleCleanup(importId: string, delayMs = IMPORT_CONFIG.sessionTtlMs): void {
@@ -493,6 +513,7 @@ export class ImportsService {
     if (session) {
       this.cleanupSessionFiles(importId)
       this.sessions.delete(importId)
+      this.store?.deleteImport(importId)
       this.cancelledSessions.delete(importId)
       this.validationCache.delete(importId)
       this.clearDerivedResults(importId)

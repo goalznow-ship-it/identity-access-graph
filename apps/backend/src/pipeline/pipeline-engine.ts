@@ -262,6 +262,17 @@ export class PipelineEngine {
     return [...this.snapshots]
   }
 
+  persistenceState() {
+    return { run: this.run, snapshots: this.snapshots, currentOutput: this.currentOutput, initialInput: this.initialInput }
+  }
+
+  restore(state: { run: PipelineRun; snapshots: StageSnapshot[]; currentOutput: StageOutput | null; initialInput: StageInput | null }): void {
+    this.run = state.run
+    this.snapshots = state.snapshots
+    this.currentOutput = state.currentOutput
+    this.initialInput = state.initialInput
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
       this.timerId = setTimeout(resolve, ms)

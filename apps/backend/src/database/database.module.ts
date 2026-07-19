@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { DATABASE_ENTITIES } from './entities'
 import { InitialOperationalPersistence1721380800000 } from './migrations/1721380800000-InitialOperationalPersistence'
 import { DatabaseHealthService } from './database-health.service'
+import { OperationalStoreService } from './operational-store.service'
 
 @Global()
 @Module({
@@ -28,7 +29,7 @@ import { DatabaseHealthService } from './database-health.service'
     }),
     TypeOrmModule.forFeature(DATABASE_ENTITIES),
   ],
-  providers: [DatabaseHealthService],
-  exports: [TypeOrmModule, DatabaseHealthService],
+  providers: [DatabaseHealthService, OperationalStoreService],
+  exports: [TypeOrmModule, DatabaseHealthService, OperationalStoreService],
 })
 export class DatabaseModule {}
