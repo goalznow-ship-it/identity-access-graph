@@ -42,40 +42,40 @@ export class PipelineService implements OnModuleInit {
     const input = await this.loadInput()
     this.engine.seed(input)
     this.inputReady = true
-    const result = await this.engine.start(input); this.persist(); return result
+    const result = await this.engine.start(input); await this.persist(); return result
   }
 
   async pause() {
     this.logger.log('Pipeline pause requested')
-    const result = await this.engine.pause(); this.persist(); return result
+    const result = await this.engine.pause(); await this.persist(); return result
   }
 
   async resume() {
     this.logger.log('Pipeline resume requested')
-    const result = await this.engine.resume(); this.persist(); return result
+    const result = await this.engine.resume(); await this.persist(); return result
   }
 
   async next() {
     this.logger.log('Pipeline next stage requested')
     await this.ensureInput()
-    const result = await this.engine.nextStage(); this.persist(); return result
+    const result = await this.engine.nextStage(); await this.persist(); return result
   }
 
   async previous() {
     this.logger.log('Pipeline previous stage requested')
-    const result = await this.engine.previousStage(); this.persist(); return result
+    const result = await this.engine.previousStage(); await this.persist(); return result
   }
 
   async replay() {
     this.logger.log('Pipeline replay requested')
-    const result = await this.engine.replay(); this.persist(); return result
+    const result = await this.engine.replay(); await this.persist(); return result
   }
 
-  reset() {
+  async reset() {
     this.logger.log('Pipeline reset requested')
     this.engine.reset()
     this.inputReady = false
-    this.persist()
+    await this.persist()
   }
 
   getState() {
@@ -96,9 +96,10 @@ export class PipelineService implements OnModuleInit {
     }
   }
 
-  private persist() {
+  private async persist() {
     const state = this.engine.getState()
     this.store?.savePipeline({ id: state.id, status: state.status, payload: this.engine.persistenceState() as unknown as Record<string, unknown>, startedAt: state.startedAt ? new Date(state.startedAt) : null, completedAt: state.completedAt ? new Date(state.completedAt) : null })
+    await this.store?.flush()
   }
 
   private async loadInput(): Promise<StageInput> {

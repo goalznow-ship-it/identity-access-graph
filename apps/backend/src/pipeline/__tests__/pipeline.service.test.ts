@@ -69,6 +69,12 @@ describe('PipelineService', () => {
     assert.strictEqual(service.getSnapshots()[0].output.nodes[0].id, 'node-2')
   })
 
+  it('should not acknowledge a pipeline mutation when PostgreSQL persistence fails', async () => {
+    const store = { savePipeline: () => undefined, flush: async () => { throw new Error('database write failed') } }
+    const service = new PipelineService(store as any)
+    await assert.rejects(() => service.reset(), /database write failed/)
+  })
+
   it('should support next/previous step-by-step', async () => {
     const service = new PipelineService()
 

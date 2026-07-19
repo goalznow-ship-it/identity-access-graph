@@ -36,7 +36,7 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     const conversion = this.imports.getConversionResult(importId)
     if (!conversion) throw new NotFoundException('Graph conversion has not been run')
     const completeGraph = conversion.fullGraph ?? conversion.preview
-    this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
+    await this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
 
     const persistenceEnabled = typeof (this.graph as any).isPersistenceEnabled === 'function' ? (this.graph as any).isPersistenceEnabled() : true
     if (!persistenceEnabled) {

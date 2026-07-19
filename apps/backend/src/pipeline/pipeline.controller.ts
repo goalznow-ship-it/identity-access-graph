@@ -98,8 +98,8 @@ export class PipelineController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Reset the pipeline to idle state' })
   @ApiResponse({ status: 200, description: 'Pipeline reset' })
-  reset() {
-    this.service.reset()
+  async reset() {
+    await this.service.reset()
     return { message: 'Pipeline reset', state: this.service.getState() }
   }
 

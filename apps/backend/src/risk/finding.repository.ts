@@ -63,4 +63,5 @@ export class FindingRepository implements OnModuleInit {
   }
   scansList(limit = 50) { return this.scans.slice(0, Math.min(200, Math.max(1, limit))) }
   scanById(id: string) { return this.scans.find((run) => run.id === id) }
+  async flush() { await this.store?.flush() }
 }

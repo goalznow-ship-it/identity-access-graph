@@ -224,7 +224,7 @@ export class IdentityResolutionService implements OnModuleInit {
       this.updateRoles(existingIdentity, props)
 
       this.enterpriseIdentities.set(existingIdentity.id, existingIdentity)
-      this.persist(existingIdentity)
+      await this.persist(existingIdentity)
       return existingIdentity
     }
 
@@ -278,7 +278,7 @@ export class IdentityResolutionService implements OnModuleInit {
     this.updateGroups(identity, props)
     this.updateRoles(identity, props)
     this.enterpriseIdentities.set(id, identity)
-    this.persist(identity)
+    await this.persist(identity)
     return identity
   }
 
@@ -337,8 +337,9 @@ export class IdentityResolutionService implements OnModuleInit {
     return Array.from(this.enterpriseIdentities.values())
   }
 
-  private persist(identity: EnterpriseIdentity): void {
+  private async persist(identity: EnterpriseIdentity): Promise<void> {
     this.store?.saveIdentity({ id: identity.id, canonicalIdentityId: identity.canonicalIdentityId, payload: identity as unknown as Record<string, unknown>, createdAt: new Date(identity.createdAt), updatedAt: new Date(identity.updatedAt) })
+    await this.store?.flush()
   }
 
   private buildSource(source: MergeSource, nodeId: string, displayName: string, props: Record<string, unknown>, matchedFields: string[]): EnterpriseIdentitySource {

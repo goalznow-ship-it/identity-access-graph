@@ -33,10 +33,10 @@ describe('PipelineController', () => {
     assert.strictEqual(result.status, 'COMPLETED')
   })
 
-  it('should reset pipeline on POST /pipeline/reset', () => {
+  it('should reset pipeline on POST /pipeline/reset', async () => {
     const service = new PipelineService()
     const controller = new PipelineController(service)
-    controller.reset()
+    await controller.reset()
     const state = controller.getState()
     assert.strictEqual(state.status, 'IDLE')
   })

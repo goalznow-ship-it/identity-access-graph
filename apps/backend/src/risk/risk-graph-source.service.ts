@@ -14,6 +14,6 @@ export class RiskGraphSourceService implements OnModuleInit{
   private memory:GraphSnapshot=mockGraph
   constructor(private graph:GraphService,private neo4j:Neo4jService,@Optional()private store?:OperationalStoreService){}
   async onModuleInit(){const row=await this.store?.loadGraph('imported');if(row)this.memory=row.payload as unknown as GraphSnapshot}
-  setMemoryGraph(graph:GraphSnapshot){this.memory=graph;this.store?.saveGraph('imported',graph as unknown as Record<string,unknown>)}
+  async setMemoryGraph(graph:GraphSnapshot){this.memory=graph;this.store?.saveGraph('imported',graph as unknown as Record<string,unknown>);await this.store?.flush()}
   async load(source:'auto'|'neo4j'|'memory'='auto'):Promise<GraphSnapshot>{if(source==='memory'||(source==='auto'&&!this.neo4j.isEnabled()))return this.memory;const result=await this.graph.getSubgraph([],{}, {limit:1000,relationshipLimit:5000});return{nodes:result.nodes,relationships:result.relationships}}
 }

@@ -25,6 +25,7 @@ export class RiskService {
     const selected = request.ruleIds?.length ? riskRules.filter((rule) => request.ruleIds!.includes(rule.id)) : riskRules
     const run: RiskScanRun = { id: randomUUID(), status: 'RUNNING', graphSource, ruleIds: selected.map((rule) => rule.id), rulesRun: 0, findingsDetected: 0, findingsResolved: 0, startedAt: new Date().toISOString() }
     this.findings.saveScan(run)
+    await this.findings.flush()
     try {
       const graph = await this.source.load(graphSource)
       const now = new Date().toISOString()
@@ -44,12 +45,14 @@ export class RiskService {
       this.findings.setScan(durationMs)
       Object.assign(run, { status: 'COMPLETED', rulesRun: selected.length, findingsDetected: detectedIds.size, findingsResolved: resolved, durationMs, completedAt: new Date().toISOString() })
       this.findings.saveScan(run)
+      await this.findings.flush()
       const critical = this.findings.list({ severity: 'CRITICAL' as any, status: FindingStatus.OPEN, limit: 500 }).length
       await this.notifications?.create({ type: 'RISK_SCAN', severity: critical ? 'CRITICAL' : detectedIds.size ? 'HIGH' : 'INFO', title: critical ? `${critical} critical risk finding${critical === 1 ? '' : 's'} detected` : 'Risk scan completed', message: `${detectedIds.size} findings detected and ${resolved} resolved across ${selected.length} rules.`, link: '/risk', metadata: { scanId: run.id, findingsDetected: detectedIds.size, findingsResolved: resolved } }).catch(() => undefined)
       return { scanId: run.id, rulesRun: run.rulesRun, findingsDetected: run.findingsDetected, findingsResolved: resolved, totalFindings: this.findings.list({ limit: 500 }).length, durationMs, graphSource }
     } catch (error) {
       Object.assign(run, { status: 'FAILED', rulesRun: selected.length, durationMs: Date.now() - started, error: (error as Error).message, completedAt: new Date().toISOString() })
       this.findings.saveScan(run)
+      await this.findings.flush()
       await this.notifications?.create({ type: 'RISK_SCAN', severity: 'HIGH', title: 'Risk scan failed', message: (error as Error).message, link: '/risk', metadata: { scanId: run.id } }).catch(() => undefined)
       throw error
     } finally {
@@ -59,7 +62,7 @@ export class RiskService {
 
   list(filters: FindingFilters) { return this.findings.list(filters) }
   get(id: string) { const finding = this.findings.get(id); if (!finding) throw new NotFoundException('Risk finding not found'); return finding }
-  setStatus(id: string, status: FindingStatus) { const result = this.findings.setStatus(id, status); if (!result) throw new NotFoundException('Risk finding not found'); return result }
+  async setStatus(id: string, status: FindingStatus) { const result = this.findings.setStatus(id, status); if (!result) throw new NotFoundException('Risk finding not found'); await this.findings.flush(); return result }
   scans(limit?: number) { return this.findings.scansList(limit) }
   scanRun(id: string) { const run = this.findings.scanById(id); if (!run) throw new NotFoundException('Risk scan not found'); return run }
   summary() {

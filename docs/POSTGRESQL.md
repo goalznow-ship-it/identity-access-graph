@@ -63,3 +63,5 @@ The suite covers migration apply/idempotence/rollback, CRUD, process-restart hyd
 PostgreSQL stores connector definitions and sync runs; import sessions, mappings, validation, correlation, converted graph data, and parsed rows; imported graph snapshots; risk findings and scan metadata; attack paths and analysis metadata; enterprise identities; and pipeline runs and snapshots.
 
 In-memory maps remain as process-local read-through/write-through caches and as isolated unit-test fallbacks. Uploaded source files remain temporary filesystem artifacts governed by the import session TTL; the parsed import state needed after restart is stored in PostgreSQL.
+
+Mutation workflows flush their queued PostgreSQL writes before returning success. This includes import snapshots, enterprise-identity merges, risk findings and scan history, and pipeline lifecycle state. A database write failure therefore propagates through the REST request instead of being acknowledged while only logging an asynchronous error.
