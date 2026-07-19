@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { EntityManager, Repository } from 'typeorm'
-import { AttackPathEntity, EnterpriseIdentityEntity, GraphSnapshotEntity, ImportSessionEntity, OperationalMetadataEntity, PipelineRunEntity, RiskFindingEntity, RiskScanRunEntity } from './entities'
+import { AttackPathEntity, AttackPathRunEntity, EnterpriseIdentityEntity, GraphSnapshotEntity, ImportSessionEntity, OperationalMetadataEntity, PipelineRunEntity, RiskFindingEntity, RiskScanRunEntity } from './entities'
 
 @Injectable()
 export class OperationalStoreService {
@@ -17,6 +17,7 @@ export class OperationalStoreService {
     @InjectRepository(EnterpriseIdentityEntity) private identities: Repository<EnterpriseIdentityEntity>,
     @InjectRepository(PipelineRunEntity) private pipelines: Repository<PipelineRunEntity>,
     @InjectRepository(OperationalMetadataEntity) private metadata: Repository<OperationalMetadataEntity>,
+    @InjectRepository(AttackPathRunEntity) private attackPathRuns?: Repository<AttackPathRunEntity>,
   ) {}
 
   loadImports() { return this.imports.find({ where: { cancelled: false }, order: { createdAt: 'ASC' } }) }
@@ -29,12 +30,9 @@ export class OperationalStoreService {
   loadRiskScans(limit = 50) { return this.riskScans.find({ order: { startedAt: 'DESC' }, take: Math.min(200, Math.max(1, limit)) }) }
   saveRiskScan(row: Partial<RiskScanRunEntity> & Pick<RiskScanRunEntity, 'id'>) { this.track(this.riskScans.save(row)); }
   loadPaths() { return this.paths.find() }
-  replacePaths(rows: AttackPathEntity[]) {
-    this.track(this.paths.manager.transaction(async (manager) => {
-      await manager.clear(AttackPathEntity)
-      if (rows.length) await manager.save(AttackPathEntity, rows)
-    }))
-  }
+  async savePaths(rows: AttackPathEntity[]) { if (rows.length) await this.paths.save(rows) }
+  loadAttackPathRuns(limit = 50) { return this.attackPathRuns?.find({ order: { startedAt: 'DESC' }, take: Math.min(200, Math.max(1, limit)) }) ?? Promise.resolve([]) }
+  saveAttackPathRun(row: Partial<AttackPathRunEntity> & Pick<AttackPathRunEntity, 'id'>) { return this.attackPathRuns?.save(row) ?? Promise.resolve(row as AttackPathRunEntity) }
   loadIdentities() { return this.identities.find() }
   saveIdentity(row: EnterpriseIdentityEntity) { this.track(this.identities.save(row)); }
   async loadLatestPipeline() {
