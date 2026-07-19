@@ -7,7 +7,7 @@
   "scripts": {
     "build": "nest build",
     "test": "npm run test:unit && npm run test:integration && npm run test:graph-integration",
-    "test:unit": "NODE_ENV=test tsx --test src/pipeline/__tests__/*.test.ts src/imports/__tests__/*.test.ts src/neo4j/__tests__/*.test.ts src/risk/__tests__/*.test.ts src/attack-path/__tests__/*.test.ts src/connectors/__tests__/*.test.ts src/identity/__tests__/*.test.ts src/notifications/__tests__/*.test.ts src/settings/__tests__/*.test.ts",
+    "test:unit": "NODE_ENV=test tsx --test src/auth/__tests__/*.test.ts src/pipeline/__tests__/*.test.ts src/imports/__tests__/*.test.ts src/neo4j/__tests__/*.test.ts src/risk/__tests__/*.test.ts src/attack-path/__tests__/*.test.ts src/connectors/__tests__/*.test.ts src/identity/__tests__/*.test.ts src/notifications/__tests__/*.test.ts src/settings/__tests__/*.test.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",

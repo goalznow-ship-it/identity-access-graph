@@ -12,6 +12,7 @@ import { IdentityModule } from '../identity'
 import { DatabaseModule } from '../database/database.module'
 import { NotificationsModule } from '../notifications'
 import { SettingsModule } from '../settings'
+import { AuthModule } from '../auth'
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SettingsModule } from '../settings'
       load: [envConfig],
     }),
     DatabaseModule,
+    AuthModule,
     NotificationsModule,
     SettingsModule,
     Neo4jModule,
