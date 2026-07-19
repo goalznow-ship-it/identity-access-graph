@@ -1,12 +1,13 @@
-import { Controller, Get, Post, Param, Body, HttpException, HttpStatus, Query } from '@nestjs/common'
+import { BadRequestException, Controller, Get, Post, Param, Body, HttpException, HttpStatus, Query } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import { IdentityResolutionService } from './identity-resolution.service'
 import type { CorrelationRequest, MergePreview } from './identity.types'
+import { GraphService } from '../graph'
 
 @ApiTags('Enterprise Identity')
 @Controller('identity')
 export class IdentityController {
-  constructor(private readonly resolutionService: IdentityResolutionService) {}
+  constructor(private readonly resolutionService: IdentityResolutionService, private readonly graph: GraphService) {}
 
   @Get('enterprise')
   @ApiOperation({ summary: 'List all enterprise identities' })
@@ -25,8 +26,13 @@ export class IdentityController {
   @Post('enterprise/correlate')
   @ApiOperation({ summary: 'Run correlation to find enterprise identity candidates' })
   async correlate(@Body() request: CorrelationRequest) {
-    const graphNodes: Record<string, unknown>[] = []
-    const result = await this.resolutionService.correlate(request, graphNodes)
+    const threshold = request.threshold ?? 70
+    if (!Number.isInteger(threshold) || threshold < 0 || threshold > 100) throw new BadRequestException('threshold must be an integer between 0 and 100')
+    const graphNodes = await this.graph.exportNodes({
+      nodeTypes: ['USER', 'LINUX_USER', 'SERVICE_ACCOUNT', 'MANAGED_SERVICE_ACCOUNT'],
+      sourceSystems: request.sourceSystems,
+    })
+    const result = await this.resolutionService.correlate({ ...request, threshold }, graphNodes.items as unknown as Record<string, unknown>[])
     return result
   }
 
@@ -37,7 +43,12 @@ export class IdentityController {
     @Body() body: { node: Record<string, unknown> },
   ) {
     const existing = this.resolutionService.getEnterpriseIdentity(id)
-    const result = await this.resolutionService.merge(body.node, existing)
+    if (!existing) throw new HttpException('Enterprise identity not found.', HttpStatus.NOT_FOUND)
+    const nodeId = String(body.node?.id ?? '')
+    if (!nodeId) throw new BadRequestException('node.id is required')
+    const node = await this.graph.getNodeById(nodeId)
+    if (!node) throw new HttpException('Target graph node not found.', HttpStatus.NOT_FOUND)
+    const result = await this.resolutionService.merge(node as unknown as Record<string, unknown>, existing)
     return result
   }
 
@@ -46,20 +57,14 @@ export class IdentityController {
   mergePreview(
     @Param('id') id: string,
     @Query('targetId') targetId?: string,
-  ): MergePreview {
+  ): Promise<MergePreview> {
     const identity = this.resolutionService.getEnterpriseIdentity(id)
     if (!identity) throw new HttpException('Enterprise identity not found.', HttpStatus.NOT_FOUND)
-    return {
-      enterpriseId: id,
-      current: identity,
-      proposed: identity,
-      newSources: [],
-      removedSources: [],
-      changedFields: [],
-      newConflicts: [],
-      resolvedConflicts: [],
-      impact: 'No changes proposed.',
-    }
+    if (!targetId?.trim()) throw new BadRequestException('targetId is required')
+    return this.graph.getNodeById(targetId).then((node) => {
+      if (!node) throw new HttpException('Target graph node not found.', HttpStatus.NOT_FOUND)
+      return this.resolutionService.previewMerge(node as unknown as Record<string, unknown>, identity)
+    })
   }
 
   @Get('enterprise/:id/conflicts')

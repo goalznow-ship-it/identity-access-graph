@@ -1,6 +1,7 @@
 import { describe, it, before, after } from 'node:test'
 import { strict as assert } from 'node:assert'
 import { IdentityResolutionService } from '../identity-resolution.service'
+import { IdentityController } from '../identity.controller'
 import { CONFIDENCE_THRESHOLD, toConfidenceLevel } from '../identity.types'
 
 function freshService(): IdentityResolutionService {
@@ -176,6 +177,46 @@ describe('IdentityResolutionService', () => {
         { id: 'FILTER-1', displayName: 'Test', properties: { email: 'test@test.com', sourceSystem: 'ACTIVE_DIRECTORY' } },
       ])
       assert.equal(result.candidates.length, 0)
+    })
+  })
+
+  describe('previewMerge', () => {
+    it('calculates merge impact without mutating or persisting the identity', async () => {
+      const service = freshService()
+      const identity = await service.merge({ id: 'PREVIEW-AD', displayName: 'Alice', sourceSystem: 'ACTIVE_DIRECTORY', properties: { employeeId: 'E-100', email: 'alice@corp.test' } })
+      const preview = service.previewMerge({ id: 'PREVIEW-ENTRA', displayName: 'Alice Cloud', sourceSystem: 'ENTRA_ID', properties: { employeeId: 'E-100', email: 'alice.cloud@corp.test' } }, identity)
+      assert.deepEqual(preview.newSources, ['ENTRA_ID'])
+      assert.equal(preview.proposed.mergedSources.length, 2)
+      assert.equal(preview.newConflicts.some((conflict) => conflict.field === 'email'), true)
+      assert.equal(identity.mergedSources.length, 1)
+      assert.match(preview.impact, /1 new conflicts/)
+    })
+
+    it('rejects low-confidence candidates in the preview', async () => {
+      const service = freshService()
+      const identity = await service.merge({ id: 'PREVIEW-ONE', displayName: 'One', properties: { employeeId: 'E-1' } })
+      const preview = service.previewMerge({ id: 'PREVIEW-TWO', displayName: 'Two', properties: { employeeId: 'E-2' } }, identity)
+      assert.equal(preview.newSources.length, 0)
+      assert.match(preview.impact, /below the 70 threshold/)
+    })
+  })
+
+  describe('Neo4j controller integration', () => {
+    it('correlates the complete authoritative identity-node inventory', async () => {
+      const resolution = freshService()
+      const identity = await resolution.merge({ id: 'AUTH-AD', displayName: 'Alex', sourceSystem: 'ACTIVE_DIRECTORY', properties: { employeeId: 'AUTH-100' } })
+      const graph = { exportNodes: async () => ({ items: [{ id: 'AUTH-ENTRA', displayName: 'Alex Cloud', sourceSystem: 'ENTRA_ID', properties: { employeeId: 'AUTH-100' } }] }) }
+      const result = await new IdentityController(resolution, graph as any).correlate({ threshold: 90 })
+      assert.equal(result.enterpriseIdentities[0].id, identity.id)
+      assert.equal(result.candidates[0].nodeId, 'AUTH-ENTRA')
+    })
+
+    it('uses the authoritative graph node when applying a merge', async () => {
+      const resolution = freshService()
+      const identity = await resolution.merge({ id: 'MERGE-AD', displayName: 'Alex', sourceSystem: 'ACTIVE_DIRECTORY', properties: { employeeId: 'MERGE-100' } })
+      const graph = { getNodeById: async () => ({ id: 'MERGE-ENTRA', displayName: 'Authoritative Name', sourceSystem: 'ENTRA_ID', properties: { employeeId: 'MERGE-100' } }) }
+      const merged = await new IdentityController(resolution, graph as any).merge(identity.id, { node: { id: 'MERGE-ENTRA', displayName: 'Spoofed Name' } })
+      assert.equal(merged.mergedSources[1].displayName, 'Authoritative Name')
     })
   })
 

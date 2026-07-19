@@ -15,6 +15,7 @@ import {
   type CorrelationCandidate,
   type CorrelationResult,
   type CorrelationRequest,
+  type MergePreview,
 } from './identity.types'
 
 interface IdentityFieldDef {
@@ -279,6 +280,53 @@ export class IdentityResolutionService implements OnModuleInit {
     this.enterpriseIdentities.set(id, identity)
     this.persist(identity)
     return identity
+  }
+
+  previewMerge(node: Record<string, unknown>, existingIdentity: EnterpriseIdentity): MergePreview {
+    const current = structuredClone(existingIdentity)
+    const proposed = structuredClone(existingIdentity)
+    const nodeId = String(node.id ?? '')
+    const displayName = String(node.displayName ?? nodeId)
+    const props = (node.properties ?? node) as Record<string, unknown>
+    const source = extractSource(node)
+    const score = this.score(props, existingIdentity)
+
+    if (!nodeId) throw new Error('Target node must have an id')
+    if (proposed.mergedSources.some((item) => item.nodeId === nodeId)) {
+      return { enterpriseId: current.id, current, proposed, newSources: [], removedSources: [], changedFields: [], newConflicts: [], resolvedConflicts: [], impact: 'This graph node is already part of the enterprise identity.' }
+    }
+    if (!score || score.score < CONFIDENCE_THRESHOLD) {
+      return { enterpriseId: current.id, current, proposed, newSources: [], removedSources: [], changedFields: [], newConflicts: [], resolvedConflicts: [], impact: `Merge rejected: confidence is below the ${CONFIDENCE_THRESHOLD} threshold.` }
+    }
+
+    proposed.mergedSources.push(this.buildSource(source, nodeId, displayName, props, [score.method]))
+    proposed.confidence = Math.max(proposed.confidence, score.score)
+    proposed.confidenceLevel = toConfidenceLevel(proposed.confidence)
+    proposed.matchedFields = this.computeMatchedFields(proposed.mergedSources)
+    proposed.conflicts = this.computeConflicts(proposed.mergedSources)
+    proposed.mergedFields = this.mergeFields(proposed.mergedSources)
+    this.updateAccounts(proposed, source, props)
+    this.updateGroups(proposed, props)
+    this.updateRoles(proposed, props)
+    proposed.statistics = this.computeStatistics(proposed)
+
+    const matchKey = (item: MergeFieldMatch) => `${item.field}|${item.valueA}|${item.valueB}|${item.matchType}`
+    const conflictKey = (item: MergeConflict) => `${item.field}|${item.sourceA}|${item.sourceB}|${item.valueA}|${item.valueB}`
+    const existingMatches = new Set(current.matchedFields.map(matchKey))
+    const existingConflicts = new Set(current.conflicts.map(conflictKey))
+    const changedFields = proposed.matchedFields.filter((item) => !existingMatches.has(matchKey(item)))
+    const newConflicts = proposed.conflicts.filter((item) => !existingConflicts.has(conflictKey(item)))
+    return {
+      enterpriseId: current.id,
+      current,
+      proposed,
+      newSources: [source],
+      removedSources: [],
+      changedFields,
+      newConflicts,
+      resolvedConflicts: [],
+      impact: `Adds ${source} as source ${proposed.mergedSources.length}, with ${changedFields.length} compared fields and ${newConflicts.length} new conflicts.`,
+    }
   }
 
   getEnterpriseIdentity(id: string): EnterpriseIdentity | undefined {

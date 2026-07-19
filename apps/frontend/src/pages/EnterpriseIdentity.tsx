@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, AlertTriangle, Shield, Users, Key, Server, Terminal, ExternalLink, Activity, RefreshCw, Search } from 'lucide-react'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
-import { listEnterpriseIdentities, getEnterpriseIdentity, getEnterpriseTimeline, getEnterpriseConflicts } from '../services/enterpriseIdentityApi'
-import type { EnterpriseIdentity, MergeSource, ConfidenceLevel } from '../types/enterprise-identity'
+import { correlateEnterprise, getMergePreview, listEnterpriseIdentities, getEnterpriseIdentity, getEnterpriseTimeline, getEnterpriseConflicts, mergeEnterpriseIdentity } from '../services/enterpriseIdentityApi'
+import type { CorrelationCandidate, EnterpriseIdentity, MergePreview, MergeSource, ConfidenceLevel } from '../types/enterprise-identity'
 
 const SOURCE_COLORS: Record<MergeSource, string> = {
   ACTIVE_DIRECTORY: 'bg-blue-500',
@@ -34,6 +34,10 @@ export function EnterpriseIdentityPage() {
   const [timeline, setTimeline] = useState<any[]>([])
   const [conflicts, setConflicts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [workflowLoading, setWorkflowLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [candidates, setCandidates] = useState<CorrelationCandidate[]>([])
+  const [preview, setPreview] = useState<MergePreview | null>(null)
   const [search, setSearch] = useState('')
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ sources: true, fields: true, conflicts: true, accounts: true, groups: true, roles: true, permissions: true, applications: true, servers: true, sudo: true, ssh: true, timeline: true })
 
@@ -46,14 +50,14 @@ export function EnterpriseIdentityPage() {
           if (found) setSelected(found)
         }
       })
-      .catch(() => {})
+      .catch((cause) => setError((cause as Error).message))
       .finally(() => setLoading(false))
   }, [selectedId])
 
   useEffect(() => {
     if (!selected) return
-    getEnterpriseTimeline(selected.id).then(setTimeline).catch(() => {})
-    getEnterpriseConflicts(selected.id).then(setConflicts).catch(() => {})
+    getEnterpriseTimeline(selected.id).then(setTimeline).catch((cause) => setError((cause as Error).message))
+    getEnterpriseConflicts(selected.id).then(setConflicts).catch((cause) => setError((cause as Error).message))
   }, [selected?.id])
 
   const filtered = useMemo(() => {
@@ -74,7 +78,34 @@ export function EnterpriseIdentityPage() {
     try {
       const identity = await getEnterpriseIdentity(id)
       setSelected(identity)
-    } catch { }
+    } catch (cause) { setError((cause as Error).message) }
+  }
+
+  const runCorrelation = async () => {
+    setWorkflowLoading(true); setError(''); setPreview(null)
+    try { setCandidates((await correlateEnterprise({ threshold: 70 })).candidates) }
+    catch (cause) { setError((cause as Error).message) }
+    finally { setWorkflowLoading(false) }
+  }
+
+  const previewCandidate = async (candidate: CorrelationCandidate) => {
+    if (!selected) return
+    setWorkflowLoading(true); setError('')
+    try { setPreview(await getMergePreview(selected.id, candidate.nodeId)) }
+    catch (cause) { setError((cause as Error).message) }
+    finally { setWorkflowLoading(false) }
+  }
+
+  const applyPreview = async () => {
+    if (!selected || !preview?.newSources.length) return
+    const candidate = candidates.find((item) => item.nodeId === preview.proposed.mergedSources.at(-1)?.nodeId)
+    if (!candidate) return
+    setWorkflowLoading(true); setError('')
+    try {
+      const merged = await mergeEnterpriseIdentity(selected.id, { id: candidate.nodeId, displayName: candidate.displayName, sourceSystem: candidate.source, properties: candidate.properties })
+      setSelected(merged); setIdentities((items) => items.map((item) => item.id === merged.id ? merged : item)); setPreview(null); setCandidates((items) => items.filter((item) => item.nodeId !== candidate.nodeId))
+    } catch (cause) { setError((cause as Error).message) }
+    finally { setWorkflowLoading(false) }
   }
 
   if (loading) {
@@ -95,10 +126,12 @@ export function EnterpriseIdentityPage() {
             Merged identities across Active Directory, Entra ID, FreeIPA, and Linux.
           </p>
         </div>
-        <Button variant="ghost" onClick={() => listEnterpriseIdentities().then(setIdentities)} className="flex items-center gap-1 text-xs">
-          <RefreshCw className="h-3 w-3" /> Refresh
-        </Button>
+        <div className="flex gap-2"><Button variant="ghost" disabled={workflowLoading} onClick={runCorrelation} className="text-xs">Find correlations</Button><Button variant="ghost" onClick={() => listEnterpriseIdentities().then(setIdentities).catch((cause) => setError((cause as Error).message))} className="flex items-center gap-1 text-xs"><RefreshCw className={`h-3 w-3 ${workflowLoading ? 'animate-spin' : ''}`} /> Refresh</Button></div>
       </div>
+
+      {error && <div role="alert" className="mb-3 rounded border border-danger/40 p-3 text-xs text-danger">{error}<button className="ml-3 underline" onClick={() => setError('')}>Dismiss</button></div>}
+      {candidates.length > 0 && <div className="mb-3 rounded-lg border border-border bg-card p-3 text-xs"><div className="mb-2 flex items-center justify-between"><strong>Correlation candidates ({candidates.length})</strong><button onClick={() => { setCandidates([]); setPreview(null) }} className="text-gray-500">Close</button></div><div className="max-h-36 space-y-1 overflow-auto">{candidates.map((candidate) => <button key={candidate.nodeId} disabled={!selected || workflowLoading} onClick={() => previewCandidate(candidate)} className="flex w-full justify-between rounded border border-border px-3 py-2 text-left hover:bg-white/5 disabled:opacity-40"><span>{candidate.displayName} · {candidate.source}</span><span className="text-primary">{candidate.confidence}% via {candidate.method}</span></button>)}</div>{!selected && <p className="mt-2 text-gray-500">Select an enterprise identity to preview a merge.</p>}</div>}
+      {preview && <div className="mb-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs"><strong>Merge preview</strong><p className="mt-1 text-gray-300">{preview.impact}</p>{preview.newConflicts.length > 0 && <p className="mt-1 text-warning">Review {preview.newConflicts.length} new conflict(s) before merging.</p>}<div className="mt-2 flex gap-2"><Button disabled={!preview.newSources.length || workflowLoading} onClick={applyPreview} className="text-xs">Confirm merge</Button><Button variant="ghost" onClick={() => setPreview(null)} className="text-xs">Cancel</Button></div></div>}
 
       <div className="flex flex-1 gap-4 overflow-hidden">
         <div className="w-72 shrink-0 space-y-2 overflow-y-auto">
