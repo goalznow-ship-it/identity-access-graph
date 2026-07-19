@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit, Optional, PayloadTooLargeException } from '@nestjs/common'
 import { PipelineEngine, type StageInput } from './pipeline-engine'
 import { allNodesFlat, relationships } from '../../../../packages/mock-data/src'
 import { OperationalStoreService } from '../database/operational-store.service'
@@ -17,6 +17,7 @@ export class PipelineService implements OnModuleInit {
   private readonly logger = new Logger(PipelineService.name)
   private readonly engine: PipelineEngine
   private readonly defaultInput: StageInput
+  private inputReady = false
 
   constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly graph?: GraphService) {
     this.engine = new PipelineEngine({ idleDelayMs: 50 })
@@ -27,13 +28,14 @@ export class PipelineService implements OnModuleInit {
 
   async onModuleInit() {
     const latest = await this.store?.loadLatestPipeline()
-    if (latest?.payload) this.engine.restore(latest.payload as any)
+    if (latest?.payload) { this.engine.restore(latest.payload as any); this.inputReady = true }
   }
 
   async start() {
     this.logger.log('Pipeline start requested')
     const input = await this.loadInput()
     this.engine.seed(input)
+    this.inputReady = true
     const result = await this.engine.start(input); this.persist(); return result
   }
 
@@ -49,6 +51,7 @@ export class PipelineService implements OnModuleInit {
 
   async next() {
     this.logger.log('Pipeline next stage requested')
+    await this.ensureInput()
     const result = await this.engine.nextStage(); this.persist(); return result
   }
 
@@ -66,6 +69,7 @@ export class PipelineService implements OnModuleInit {
     this.logger.log('Pipeline reset requested')
     this.engine.reset()
     this.engine.seed(this.defaultInput)
+    this.inputReady = false
     this.persist()
   }
 
@@ -85,6 +89,7 @@ export class PipelineService implements OnModuleInit {
   private async loadInput(): Promise<StageInput> {
     if (!this.graph?.isPersistenceEnabled()) return this.defaultInput
     const [nodes, relationships] = await Promise.all([this.graph.exportNodes(), this.graph.exportRelationships()])
+    if (nodes.truncated || relationships.truncated) throw new PayloadTooLargeException('The graph exceeds the 50,000-record pipeline snapshot limit. Narrow or archive the graph before running the pipeline.')
     const input = {
       nodes: nodes.items as unknown as Record<string, unknown>[],
       relationships: relationships.items.map((item) => item.relationship) as unknown as Record<string, unknown>[],
@@ -92,5 +97,11 @@ export class PipelineService implements OnModuleInit {
     }
     this.logger.log(`Loaded pipeline snapshot from Neo4j with ${input.nodes.length} nodes and ${input.relationships.length} relationships`)
     return input
+  }
+
+  private async ensureInput() {
+    if (this.inputReady) return
+    this.engine.seed(await this.loadInput())
+    this.inputReady = true
   }
 }

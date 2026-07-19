@@ -31,6 +31,20 @@ describe('PipelineService', () => {
     assert.strictEqual(first.output.metadata.source, 'neo4j')
   })
 
+  it('should load Neo4j before step-by-step execution', async () => {
+    let loaded = 0
+    const graph = { isPersistenceEnabled: () => true, exportNodes: async () => { loaded++; return { items: [{ id: 'neo-user', nodeType: 'USER', properties: {} }], truncated: false } }, exportRelationships: async () => ({ items: [], truncated: false }) }
+    const service = new PipelineService(undefined, graph as any)
+    await service.next()
+    assert.strictEqual(loaded, 1)
+    assert.strictEqual(service.getSnapshots()[0].output.metadata.source, 'neo4j')
+  })
+
+  it('should reject truncated graph snapshots', async () => {
+    const graph = { isPersistenceEnabled: () => true, exportNodes: async () => ({ items: [], truncated: true }), exportRelationships: async () => ({ items: [], truncated: false }) }
+    await assert.rejects(() => new PipelineService(undefined, graph as any).start(), /50,000-record pipeline snapshot limit/)
+  })
+
   it('should support next/previous step-by-step', async () => {
     const service = new PipelineService()
 
