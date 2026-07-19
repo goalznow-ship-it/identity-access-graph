@@ -117,10 +117,10 @@ export function EntityExplorer({ title, subtitle, nodeTypes }: { title: string; 
           <option value="">All risks</option>
           {['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((value) => <option key={value}>{value}</option>)}
         </select>
-        <select aria-label="Source filter" value={system} onChange={(event) => setSystem(event.target.value)} className="rounded border border-border bg-surface px-2 text-xs">
+        {source === 'neo4j' ? <input aria-label="Source filter" value={system} onChange={(event) => setSystem(event.target.value)} placeholder="Source system" className="rounded border border-border bg-surface px-2 text-xs" /> : <select aria-label="Source filter" value={system} onChange={(event) => setSystem(event.target.value)} className="rounded border border-border bg-surface px-2 text-xs">
           <option value="">All sources</option>
           {systems.map((value) => <option key={value}>{value}</option>)}
-        </select>
+        </select>}
         <select aria-label="Sort field" value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="rounded border border-border bg-surface px-2 text-xs">
           <option value="displayName">Name</option><option value="nodeType">Type</option><option value="sourceSystem">Source</option><option value="riskLevel">Risk</option><option value="status">Status</option>
         </select>

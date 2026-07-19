@@ -5,7 +5,7 @@ import { buildGraphData } from '../services/graphDataAdapter'
 import { getActiveImportGraphPreview, getImportGraphPreview, ImportApiError } from '../services/importApi'
 import { useNeo4jGraph } from './useNeo4jGraph'
 
-export function useGraphData(importId?:string|null,source:GraphSourceMode=importId?'imported':'mock',filters:Record<string,unknown>={}){
+export function useGraphData(importId?:string|null,source:GraphSourceMode=importId?'imported':'neo4j',filters:Record<string,unknown>={}){
   const neo4j=useNeo4jGraph(source==='neo4j',filters)
   const[data,setData]=useState<GraphData|null>(source==='mock'?buildGraphData():null)
   const[loading,setLoading]=useState(source!=='mock'&&source!=='neo4j')
