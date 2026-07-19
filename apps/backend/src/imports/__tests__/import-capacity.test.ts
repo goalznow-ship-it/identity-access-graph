@@ -106,6 +106,14 @@ describe('ImportsService - Cancel', () => {
     const service = new ImportsService()
     assert.equal(service.cancel('nonexistent'), false)
   })
+
+  it('does not return a cancelled session as the active import', async () => {
+    const service = new ImportsService()
+    const first = await service.upload([makeFile('active.csv', 'text/csv', 'id,name\n1,Alice')])
+    const second = await service.upload([makeFile('cancelled.csv', 'text/csv', 'id,name\n2,Bob')])
+    service.cancel(second.importId)
+    assert.equal(service.getLatestSession()?.importId, first.importId)
+  })
 })
 
 describe('ImportsService - Retry', () => {

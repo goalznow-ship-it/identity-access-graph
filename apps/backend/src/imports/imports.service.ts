@@ -143,8 +143,7 @@ export class ImportsService {
         })
       } catch (err) {
         this.logger.error(`Failed to parse file ${file.originalname}: ${(err as Error).message}`)
-        importFiles.push(this.errorFile(file, `Failed to parse: ${(err as Error).message}`))
-        if (fs.existsSync(destPath)) fs.unlinkSync(destPath)
+        importFiles.push(this.errorFile(file, `Failed to parse: ${(err as Error).message}`, fileId, destPath))
       }
     }
 
@@ -184,7 +183,9 @@ export class ImportsService {
   }
 
   getLatestSession(): ImportSession | undefined {
-    return [...this.sessions.values()].sort((a, b) => b.createdAt - a.createdAt)[0]
+    return [...this.sessions.values()]
+      .filter((session) => !session.cancelled && !this.cancelledSessions.has(session.importId))
+      .sort((a, b) => b.createdAt - a.createdAt)[0]
   }
 
   getProgress(importId: string): SessionProgress | null {
@@ -248,6 +249,7 @@ export class ImportsService {
 
       this.clearMappings(importId, fileId, 0)
       this.invalidateAllDerived(importId)
+      this.persistSnapshot(importId)
       return session
     } catch (err) {
       this.logger.error(`Retry failed for file ${file.originalName}: ${(err as Error).message}`)
@@ -255,6 +257,7 @@ export class ImportsService {
         ...file,
         error: `Retry failed: ${(err as Error).message}`,
       }
+      this.persistSnapshot(importId)
       return null
     }
   }
@@ -275,8 +278,10 @@ export class ImportsService {
 
     for (let si = 0; si < (file.sheets?.length ?? 0); si++) {
       this.mappingCache.delete(this.sheetKey(importId, fileId, si))
+      this.fullRowsCache.delete(this.sheetKey(importId, fileId, si))
     }
     this.invalidateAllDerived(importId)
+    this.persistSnapshot(importId)
 
     return session
   }
@@ -285,6 +290,7 @@ export class ImportsService {
     this.mappingCache.set(this.sheetKey(importId, fileId, sheetIndex), mappings.map((m) => ({ ...m })))
     this.invalidateValidationResult(importId, fileId, sheetIndex)
     this.clearDerivedResults(importId)
+    this.persistSnapshot(importId)
   }
 
   getMappings(importId: string, fileId: string, sheetIndex: number): ColumnMapping[] | undefined {
@@ -325,6 +331,7 @@ export class ImportsService {
     file.sheets[sheetIndex].classification = type as any
     file.status = 'classified'
     this.clearMappings(importId, fileId, sheetIndex)
+    this.persistSnapshot(importId)
 
     return session
   }
@@ -428,6 +435,11 @@ export class ImportsService {
         const session = payload.session as ImportSession
         if (!session?.importId) continue
         if (Date.now() - session.createdAt > IMPORT_CONFIG.sessionTtlMs) {
+          for (const file of session.files ?? []) {
+            if (file.filePath && fs.existsSync(file.filePath)) {
+              try { fs.unlinkSync(file.filePath) } catch { /* ignore stale file cleanup races */ }
+            }
+          }
           fs.unlinkSync(path.join(STATE_DIR, name))
           continue
         }
@@ -437,24 +449,24 @@ export class ImportsService {
         if (payload.correlation) this.correlationCache.set(session.importId, payload.correlation)
         if (payload.conversion) this.conversionCache.set(session.importId, payload.conversion)
         if (payload.cancelled) this.cancelledSessions.add(session.importId)
-        this.scheduleCleanup(session.importId)
+        this.scheduleCleanup(session.importId, Math.max(0, IMPORT_CONFIG.sessionTtlMs - (Date.now() - session.createdAt)))
       } catch (error) {
         this.logger.warn(`Ignoring invalid import snapshot ${name}: ${(error as Error).message}`)
       }
     }
   }
 
-  private scheduleCleanup(importId: string): void {
+  private scheduleCleanup(importId: string, delayMs = IMPORT_CONFIG.sessionTtlMs): void {
     const timer = setTimeout(() => {
       this.cleanupSession(importId)
-    }, IMPORT_CONFIG.sessionTtlMs)
+    }, delayMs)
     timer.unref()
     this.sessionTimers.set(importId, timer)
   }
 
-  private errorFile(file: Express.Multer.File, error: string): ImportFile {
+  private errorFile(file: Express.Multer.File, error: string, id = randomUUID(), filePath?: string): ImportFile {
     return {
-      id: randomUUID(),
+      id,
       originalName: file.originalname,
       sanitizedName: sanitizeName(file.originalname),
       mimeType: file.mimetype,
@@ -462,6 +474,7 @@ export class ImportsService {
       status: 'error',
       sheets: [],
       error,
+      filePath,
     }
   }
 
@@ -493,6 +506,10 @@ export class ImportsService {
       if (timer) {
         clearTimeout(timer)
         this.sessionTimers.delete(importId)
+      }
+      const snapshot = this.snapshotPath(importId)
+      if (fs.existsSync(snapshot)) {
+        try { fs.unlinkSync(snapshot) } catch { /* ignore cleanup races */ }
       }
     }
   }
