@@ -578,7 +578,6 @@ export class ImportsService implements OnModuleInit {
     if (session) {
       this.cleanupSessionFiles(importId)
       this.sessions.delete(importId)
-      this.store?.deleteImport(importId)
       this.cancelledSessions.delete(importId)
       this.validationCache.delete(importId)
       this.clearDerivedResults(importId)

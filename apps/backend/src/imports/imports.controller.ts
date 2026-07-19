@@ -1,6 +1,6 @@
 import {
   Controller, Post, Put, Get, Delete, HttpCode, HttpException, HttpStatus,
-  UseInterceptors, UploadedFiles, Param, Body, Query,
+  UseInterceptors, UploadedFiles, Param, Body, Query, Res,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger'
 import { FilesInterceptor } from '@nestjs/platform-express'
@@ -14,6 +14,8 @@ import { IdentityCorrelationService, type CorrelationOptions, type CorrelationRe
 import { GraphConversionService } from './graph-conversion'
 import { deterministicId } from './graph-conversion/deterministic-id'
 import { ImportGraphPersistenceService } from './import-graph-persistence.service'
+import { ImportReportingService } from './import-reporting.service'
+import type { Response } from 'express'
 
 @ApiTags('Imports')
 @Controller('imports')
@@ -25,6 +27,7 @@ export class ImportsController {
     private readonly correlationService: IdentityCorrelationService,
     private readonly conversionService: GraphConversionService,
     private readonly persistenceService: ImportGraphPersistenceService,
+    private readonly reporting: ImportReportingService,
   ) {}
 
   @Get('limits')
@@ -32,6 +35,10 @@ export class ImportsController {
   getLimits() {
     return this.service.getLimits()
   }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Get durable import history' })
+  history(@Query('limit') limit?: string, @Query('offset') offset?: string) { return this.reporting.history(Number(limit ?? 50), Number(offset ?? 0)) }
 
   @Post('upload')
   @HttpCode(200)
@@ -284,6 +291,7 @@ export class ImportsController {
       sheet.headers, rows, mappings,
     )
     this.service.setValidationResult(importId, result)
+    await this.reporting.saveValidation(result)
     return result
   }
 
@@ -296,6 +304,29 @@ export class ImportsController {
     const session = this.service.getSession(importId)
     if (!session) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
     return this.service.getValidationResults(importId)
+  }
+
+  @Get(':importId/validation-report')
+  validationReport(@Param('importId') importId: string) { return this.reporting.validationReport(importId) }
+
+  @Get(':importId/error-report.csv')
+  async errorReport(@Param('importId') importId: string, @Res() response: Response) {
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    response.setHeader('Content-Disposition', `attachment; filename="import-${importId}-errors.csv"`)
+    response.send(await this.reporting.errorCsv(importId))
+  }
+
+  @Get(':importId/audit')
+  audit(@Param('importId') importId: string) { return this.reporting.auditLog(importId) }
+
+  @Get(':importId/jobs')
+  jobs(@Param('importId') importId: string) { return this.reporting.jobsFor(importId) }
+
+  @Get(':importId/statistics')
+  async statistics(@Param('importId') importId: string) {
+    const result = await this.reporting.statistics(importId)
+    if (!result) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
+    return result
   }
 
   @Get(':importId/normalized-preview')

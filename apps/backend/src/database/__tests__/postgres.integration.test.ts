@@ -15,6 +15,8 @@ import {
   ImportSessionEntity,
   ImportAuditLogEntity,
   ImportJobEntity,
+  ImportRowChunkEntity,
+  ImportValidationIssueEntity,
   OperationalMetadataEntity,
   PipelineRunEntity,
   RiskFindingEntity,
@@ -23,6 +25,7 @@ import { InitialOperationalPersistence1721380800000 } from '../migrations/172138
 import { EnterpriseImportEngine1721467200000 } from '../migrations/1721467200000-EnterpriseImportEngine'
 import { OperationalStoreService } from '../operational-store.service'
 import { ImportQueueService } from '../../imports/import-queue.service'
+import { ImportReportingService } from '../../imports/import-reporting.service'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
 
@@ -153,5 +156,19 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
     assert.equal((await queue.jobsFor(importId))[0].status, 'COMPLETED')
     assert.deepEqual((await queue.jobsFor(importId))[0].checkpoint, { row: 5000 })
     assert.deepEqual((await queue.auditFor(importId)).map((entry) => entry.event), ['JOB_QUEUED', 'JOB_COMPLETED'])
+  })
+
+  it('builds durable history, validation, duplicate, error, and statistics reports', async () => {
+    const importId = randomUUID(), fileId = randomUUID(), now = Date.now()
+    await dataSource.getRepository(ImportSessionEntity).save({ importId, status: 'completed', cancelled: false, payload: { session: { importId, files: [{ id: fileId, status: 'inspected', size: 42 }] } }, createdAt: new Date(now), expiresAt: new Date(now + 60_000) })
+    await dataSource.getRepository(ImportRowChunkEntity).save({ importId, fileId, sheetIndex: 0, chunkIndex: 0, rowStart: 1, rowEnd: 2, rows: [{ id: '1' }, { id: '1' }] })
+    const reporting = new ImportReportingService(dataSource.getRepository(ImportSessionEntity), dataSource.getRepository(ImportJobEntity), dataSource.getRepository(ImportAuditLogEntity), dataSource.getRepository(ImportRowChunkEntity), dataSource.getRepository(ImportValidationIssueEntity))
+    await reporting.saveValidation({ importId, fileId, sheetIndex: 0, summary: { total: 1, info: 0, warning: 0, error: 1, critical: 0 }, issues: [{ code: 'DUP_ID', severity: 'ERROR', message: 'Duplicate ID', file: 'users.csv', sheet: 'users', row: 2, sourceColumn: 'id', targetField: 'id', rawValue: '1', suggestedResolution: 'Remove duplicate.' }] })
+    const report = await reporting.validationReport(importId), statistics = await reporting.statistics(importId)
+    assert.equal(report.summary.error, 1)
+    assert.match(await reporting.errorCsv(importId), /Duplicate ID/)
+    assert.equal(statistics?.rows, 2)
+    assert.equal(statistics?.duplicates, 1)
+    assert.ok((await reporting.history()).imports.some((item) => item.importId === importId))
   })
 })
