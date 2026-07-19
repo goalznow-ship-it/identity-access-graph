@@ -147,4 +147,23 @@ export class ImportValidationIssueEntity {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
 }
 
-export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, AttackPathEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity]
+@Entity('graph_versions')
+export class GraphVersionEntity {
+  @PrimaryColumn('uuid') id!: string
+  @Index({ unique: true }) @Column({ type: 'bigint' }) sequence!: string
+  @Column({ type: 'varchar', length: 32 }) status!: string
+  @Column({ type: 'varchar', length: 128 }) source!: string
+  @Column({ type: 'text', nullable: true }) description!: string | null
+  @Column({ name: 'parent_version_id', type: 'uuid', nullable: true }) parentVersionId!: string | null
+  @Column({ name: 'nodes_added', type: 'integer', default: 0 }) nodesAdded!: number
+  @Column({ name: 'nodes_updated', type: 'integer', default: 0 }) nodesUpdated!: number
+  @Column({ name: 'nodes_deleted', type: 'integer', default: 0 }) nodesDeleted!: number
+  @Column({ name: 'relationships_added', type: 'integer', default: 0 }) relationshipsAdded!: number
+  @Column({ name: 'relationships_updated', type: 'integer', default: 0 }) relationshipsUpdated!: number
+  @Column({ name: 'relationships_deleted', type: 'integer', default: 0 }) relationshipsDeleted!: number
+  @Column({ type: 'jsonb', default: {} }) metadata!: Record<string, unknown>
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true }) completedAt!: Date | null
+}
+
+export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, AttackPathEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity, GraphVersionEntity]
