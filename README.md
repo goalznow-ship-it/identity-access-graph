@@ -20,3 +20,5 @@ A platform for modeling, visualizing, and managing complex identity and access r
 PostgreSQL is required for backend runtime state. See [docs/POSTGRESQL.md](docs/POSTGRESQL.md) for local setup, migrations, health checks, and integration-test commands.
 
 The production import queue and reporting APIs are documented in [docs/ENTERPRISE_IMPORT_ENGINE.md](docs/ENTERPRISE_IMPORT_ENGINE.md).
+
+Neo4j graph versioning, snapshots, traversal, indexes, and operational commands are documented in [docs/ENTERPRISE_GRAPH_ENGINE.md](docs/ENTERPRISE_GRAPH_ENGINE.md).
