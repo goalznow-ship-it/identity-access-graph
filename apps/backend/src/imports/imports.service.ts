@@ -7,7 +7,7 @@ import { parseCsv } from './parsers/csv-parser'
 import { parseExcel } from './parsers/excel-parser'
 import { parseJson } from './parsers/json-parser'
 import { classify } from './classification/classifier'
-import type { ImportFile, ImportSession, DatasetType, SessionProgress, ImportPhase, ImportLimits } from './types'
+import type { ImportFile, ImportSession, DatasetType, SessionProgress, ImportPhase, ImportLimits, ParsedSheetInfo, SheetInfo } from './types'
 import type { ValidationResult } from './validation/validation.service'
 import type { ColumnMapping } from './mapping/mapping.service'
 import type { CorrelationResult } from './correlation'
@@ -35,6 +35,7 @@ export class ImportsService {
   private conversionCache = new Map<string, ConversionResult>()
   private sessionTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private cancelledSessions = new Set<string>()
+  private fullRowsCache = new Map<string, Record<string, unknown>[]>()
 
   private sheetKey(importId: string, fileId: string, sheetIndex: number): string {
     return `${importId}:${fileId}:${sheetIndex}`
@@ -100,21 +101,26 @@ export class ImportsService {
       try {
         fs.writeFileSync(destPath, file.buffer)
 
-        let sheets: Awaited<ReturnType<typeof parseCsv>>[] = []
+        let parsedSheets: ParsedSheetInfo[] = []
 
         if (ext === '.csv') {
-          sheets = [await parseCsv(destPath, file.originalname.replace(ext, ''))]
+          parsedSheets = [await parseCsv(destPath, file.originalname.replace(ext, ''))]
         } else if (ext === '.json' || ext === '.jsonl' || ext === '.ndjson') {
-          sheets = [parseJson(destPath, file.originalname.replace(ext, ''))]
+          parsedSheets = [parseJson(destPath, file.originalname.replace(ext, ''))]
         } else {
-          sheets = parseExcel(destPath)
+          parsedSheets = parseExcel(destPath)
         }
 
-        for (const sheet of sheets) {
+        for (const sheet of parsedSheets) {
           const classification = classify(sheet.headers)
           sheet.classification = classification.type
           sheet.classificationConfidence = classification.confidence
         }
+
+        const sheets: SheetInfo[] = parsedSheets.map(({ allRows: _allRows, ...sheet }, sheetIndex) => {
+          this.fullRowsCache.set(this.sheetKey(importId, fileId, sheetIndex), parsedSheets[sheetIndex].allRows)
+          return sheet
+        })
 
         importFiles.push({
           id: fileId,
@@ -212,21 +218,26 @@ export class ImportsService {
 
     try {
       const ext = path.extname(file.originalName).toLowerCase()
-      let sheets: Awaited<ReturnType<typeof parseCsv>>[] = []
+      let parsedSheets: ParsedSheetInfo[] = []
 
       if (ext === '.csv') {
-        sheets = [await parseCsv(file.filePath, file.originalName.replace(ext, ''))]
+        parsedSheets = [await parseCsv(file.filePath, file.originalName.replace(ext, ''))]
       } else if (ext === '.json' || ext === '.jsonl' || ext === '.ndjson') {
-        sheets = [parseJson(file.filePath, file.originalName.replace(ext, ''))]
+        parsedSheets = [parseJson(file.filePath, file.originalName.replace(ext, ''))]
       } else {
-        sheets = parseExcel(file.filePath)
+        parsedSheets = parseExcel(file.filePath)
       }
 
-      for (const sheet of sheets) {
+      for (const sheet of parsedSheets) {
         const classification = classify(sheet.headers)
         sheet.classification = classification.type
         sheet.classificationConfidence = classification.confidence
       }
+
+      const sheets: SheetInfo[] = parsedSheets.map(({ allRows: _allRows, ...sheet }, sheetIndex) => {
+        this.fullRowsCache.set(this.sheetKey(importId, fileId, sheetIndex), parsedSheets[sheetIndex].allRows)
+        return sheet
+      })
 
       session.files[fileIndex] = {
         ...file,
@@ -278,6 +289,23 @@ export class ImportsService {
 
   getMappings(importId: string, fileId: string, sheetIndex: number): ColumnMapping[] | undefined {
     return this.mappingCache.get(this.sheetKey(importId, fileId, sheetIndex))?.map((m) => ({ ...m }))
+  }
+
+  async getSheetRows(importId: string, fileId: string, sheetIndex: number): Promise<Record<string, unknown>[]> {
+    const key = this.sheetKey(importId, fileId, sheetIndex)
+    const cached = this.fullRowsCache.get(key)
+    if (cached) return cached
+    const session = this.sessions.get(importId)
+    const file = session?.files.find((item) => item.id === fileId)
+    if (!file?.filePath || !fs.existsSync(file.filePath)) return file?.sheets[sheetIndex]?.previewRows ?? []
+    const ext = path.extname(file.originalName).toLowerCase()
+    const parsed = ext === '.csv'
+      ? [await parseCsv(file.filePath, file.originalName.replace(ext, ''))]
+      : ext === '.json' || ext === '.jsonl' || ext === '.ndjson'
+        ? [parseJson(file.filePath, file.originalName.replace(ext, ''))]
+        : parseExcel(file.filePath)
+    parsed.forEach((sheet, index) => this.fullRowsCache.set(this.sheetKey(importId, fileId, index), sheet.allRows))
+    return this.fullRowsCache.get(key) ?? []
   }
 
   clearMappings(importId: string, fileId: string, sheetIndex: number): void {
@@ -457,6 +485,9 @@ export class ImportsService {
       this.clearDerivedResults(importId)
       for (const key of this.mappingCache.keys()) {
         if (key.startsWith(`${importId}:`)) this.mappingCache.delete(key)
+      }
+      for (const key of this.fullRowsCache.keys()) {
+        if (key.startsWith(`${importId}:`)) this.fullRowsCache.delete(key)
       }
       const timer = this.sessionTimers.get(importId)
       if (timer) {

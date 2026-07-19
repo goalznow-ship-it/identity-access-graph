@@ -1,9 +1,9 @@
 import * as XLSX from 'xlsx'
 import * as path from 'node:path'
 import { IMPORT_CONFIG } from '../import-config'
-import type { SheetInfo, SheetWarning } from '../types'
+import type { ParsedSheetInfo, SheetWarning } from '../types'
 
-export function parseExcel(filePath: string): SheetInfo[] {
+export function parseExcel(filePath: string): ParsedSheetInfo[] {
   const ext = path.extname(filePath).toLowerCase()
   if (ext === '.json' || ext === '.jsonl' || ext === '.ndjson') {
     return []
@@ -18,7 +18,7 @@ export function parseExcel(filePath: string): SheetInfo[] {
     type: 'file',
   })
 
-  const sheets: SheetInfo[] = []
+  const sheets: ParsedSheetInfo[] = []
   const sheetCount = Math.min(workbook.SheetNames.length, IMPORT_CONFIG.maxSheetsPerWorkbook)
 
   for (let si = 0; si < sheetCount; si++) {
@@ -72,13 +72,14 @@ export function parseExcel(filePath: string): SheetInfo[] {
       warnings,
       classification: 'Unknown',
       classificationConfidence: 0,
+      allRows: dataRows,
     })
   }
 
   return sheets
 }
 
-function emptySheet(sheetName: string): SheetInfo {
+function emptySheet(sheetName: string): ParsedSheetInfo {
   return {
     name: sheetName,
     rowCount: 0,
@@ -88,5 +89,6 @@ function emptySheet(sheetName: string): SheetInfo {
     warnings: [{ type: 'empty_sheet', message: `Sheet "${sheetName}" is empty.` }],
     classification: 'Unknown',
     classificationConfidence: 0,
+    allRows: [],
   }
 }

@@ -49,6 +49,11 @@ export interface SheetInfo {
   manualOverride?: DatasetType
 }
 
+/** Internal parser result. `allRows` is retained by ImportsService and is never serialized in API responses. */
+export interface ParsedSheetInfo extends SheetInfo {
+  allRows: Record<string, unknown>[]
+}
+
 export interface SheetWarning {
   type: 'empty_columns' | 'duplicate_rows' | 'empty_sheet' | 'truncated'
   message: string

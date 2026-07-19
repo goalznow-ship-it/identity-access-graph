@@ -26,6 +26,7 @@ export interface ConversionResult {
   sourceSystemCounts: Record<string, number>
   correlationSummary: CorrelationResult['summary']
   preview: GraphPreview
+  fullGraph?: { nodes: ImportedGraphNode[]; links: ImportedGraphRelationship[] }
 }
 
 @Injectable()
@@ -67,6 +68,7 @@ export class GraphConversionService {
       relationshipTypeCounts: count(relationships, (relationship) => relationship.relationshipType),
       sourceSystemCounts: count(nodes, (node) => node.sourceSystem), correlationSummary: correlation.summary,
       preview: { nodes: previewNodes, links: previewLinks, correlationGroups: correlation.groups, unresolvedReferences: unresolved, conflicts, warnings: truncated ? ['Preview truncated by requested limits'] : [], pagination: { nodeLimit, relationshipLimit, totalNodes: nodes.length, totalRelationships: relationships.length, truncated } },
+      fullGraph: { nodes, links: relationships },
     }
   }
 }

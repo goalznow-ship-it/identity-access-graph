@@ -2,9 +2,9 @@ import * as fs from 'node:fs'
 import * as readline from 'node:readline'
 import * as path from 'node:path'
 import { IMPORT_CONFIG } from '../import-config'
-import type { SheetInfo, SheetWarning } from '../types'
+import type { ParsedSheetInfo, SheetWarning } from '../types'
 
-export async function parseCsv(filePath: string, sheetName: string): Promise<SheetInfo> {
+export async function parseCsv(filePath: string, sheetName: string): Promise<ParsedSheetInfo> {
   const stat = fs.statSync(filePath)
   if (stat.size === 0) {
     return emptyResult(sheetName, 'CSV file is empty.')
@@ -99,6 +99,7 @@ export async function parseCsv(filePath: string, sheetName: string): Promise<She
         warnings,
         classification: 'Unknown',
         classificationConfidence: 0,
+        allRows,
       })
     })
 
@@ -137,7 +138,7 @@ function truncateCell(val: string): string {
     : val
 }
 
-function emptyResult(sheetName: string, msg: string): SheetInfo {
+function emptyResult(sheetName: string, msg: string): ParsedSheetInfo {
   return {
     name: sheetName,
     rowCount: 0,
@@ -147,5 +148,6 @@ function emptyResult(sheetName: string, msg: string): SheetInfo {
     warnings: [{ type: 'empty_sheet', message: msg }],
     classification: 'Unknown',
     classificationConfidence: 0,
+    allRows: [],
   }
 }

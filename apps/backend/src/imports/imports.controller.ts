@@ -252,7 +252,7 @@ export class ImportsController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Validate mapped data' })
   @ApiResponse({ status: 200, description: 'Validation results' })
-  validate(
+  async validate(
     @Param('importId') importId: string,
     @Body() body: ValidateRequest,
   ) {
@@ -267,10 +267,11 @@ export class ImportsController {
     const sheet = file.sheets[body.sheetIndex]
     const mappings = this.service.getMappings(importId, body.fileId, body.sheetIndex)
       ?? this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
+    const rows = await this.service.getSheetRows(importId, body.fileId, body.sheetIndex)
     const result = this.validationService.validateSheet(
       importId, body.fileId, file.originalName,
       body.sheetIndex, sheet.name,
-      sheet.headers, sheet.previewRows, mappings,
+      sheet.headers, rows, mappings,
     )
     this.service.setValidationResult(importId, result)
     return result
@@ -315,7 +316,7 @@ export class ImportsController {
     return results
   }
 
-  private buildCorrelationRecords(importId: string): CorrelationRecord[] {
+  private async buildCorrelationRecords(importId: string): Promise<CorrelationRecord[]> {
     const session = this.service.getSession(importId)
     if (!session) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
     const validations = this.service.getValidationResults(importId)
@@ -325,7 +326,8 @@ export class ImportsController {
         const sheet = file.sheets[sheetIndex]
         const mappings = this.service.getMappings(importId, file.id, sheetIndex)
           ?? this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
-        const normalized = generateNormalizedPreview(sheet.previewRows, mappings, sheet.previewRows.length)
+        const rows = await this.service.getSheetRows(importId, file.id, sheetIndex)
+        const normalized = generateNormalizedPreview(rows, mappings, rows.length)
         const validation = validations.find((result) => result.fileId === file.id && result.sheetIndex === sheetIndex)
         for (const record of normalized) {
           const hasError = validation?.issues.some((issue) => issue.row === record.row && ['ERROR', 'CRITICAL'].includes(issue.severity))
@@ -343,8 +345,8 @@ export class ImportsController {
 
   @Post(':importId/correlate')
   @HttpCode(200)
-  correlate(@Param('importId') importId: string, @Body() options: CorrelationOptions = {}) {
-    const result = this.correlationService.correlate(importId, this.buildCorrelationRecords(importId), options)
+  async correlate(@Param('importId') importId: string, @Body() options: CorrelationOptions = {}) {
+    const result = this.correlationService.correlate(importId, await this.buildCorrelationRecords(importId), options)
     this.service.setCorrelationResult(importId, result)
     return result
   }
@@ -359,8 +361,8 @@ export class ImportsController {
 
   @Post(':importId/convert')
   @HttpCode(200)
-  convert(@Param('importId') importId: string, @Body() body: { nodeLimit?: number; relationshipLimit?: number } = {}) {
-    const records = this.buildCorrelationRecords(importId)
+  async convert(@Param('importId') importId: string, @Body() body: { nodeLimit?: number; relationshipLimit?: number } = {}) {
+    const records = await this.buildCorrelationRecords(importId)
     const correlation = this.service.getCorrelationResult(importId) ?? this.correlationService.correlate(importId, records)
     this.service.setCorrelationResult(importId, correlation)
     const result = this.conversionService.convert(
@@ -369,18 +371,19 @@ export class ImportsController {
       body.relationshipLimit ?? IMPORT_CONFIG.maxGraphPreviewRelationships,
     )
     this.service.setConversionResult(importId, result)
-    return result
+    const { fullGraph: _fullGraph, ...response } = result
+    return response
   }
 
   @Get(':importId/graph-preview')
-  getGraphPreview(@Param('importId') importId: string, @Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
+  async getGraphPreview(@Param('importId') importId: string, @Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
     const requestedLimits = nodeLimit !== undefined || relationshipLimit !== undefined
     const parsedNodeLimit = Number(nodeLimit ?? IMPORT_CONFIG.maxGraphPreviewNodes)
     const parsedRelationshipLimit = Number(relationshipLimit ?? IMPORT_CONFIG.maxGraphPreviewRelationships)
     if (requestedLimits && (!Number.isInteger(parsedNodeLimit) || parsedNodeLimit < 0 || !Number.isInteger(parsedRelationshipLimit) || parsedRelationshipLimit < 0)) {
       throw new HttpException('Preview limits must be non-negative integers.', HttpStatus.BAD_REQUEST)
     }
-    if (requestedLimits) return this.convert(importId, { nodeLimit: parsedNodeLimit, relationshipLimit: parsedRelationshipLimit }).preview
+    if (requestedLimits) return (await this.convert(importId, { nodeLimit: parsedNodeLimit, relationshipLimit: parsedRelationshipLimit })).preview
     const result = this.service.getConversionResult(importId)
     if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
     return result.preview
@@ -390,7 +393,7 @@ export class ImportsController {
   getConversionSummary(@Param('importId') importId: string) {
     const result = this.service.getConversionResult(importId)
     if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
-    const { preview: _preview, ...summary } = result
+    const { preview: _preview, fullGraph: _fullGraph, ...summary } = result
     return summary
   }
 

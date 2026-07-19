@@ -43,8 +43,9 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
       }
     }
 
-    const nodes = conversion.preview.nodes as PersistedGraphNode[]
-    const relationships = conversion.preview.links as PersistedGraphRelationship[]
+    const graph = conversion.fullGraph ?? conversion.preview
+    const nodes = graph.nodes as PersistedGraphNode[]
+    const relationships = graph.links as PersistedGraphRelationship[]
     const nodeSummary = await this.graph.upsertNodes(nodes)
     const relationshipSummary = await this.graph.upsertRelationships(relationships)
     return {

@@ -1,9 +1,9 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { IMPORT_CONFIG } from '../import-config'
-import type { SheetInfo, SheetWarning } from '../types'
+import type { ParsedSheetInfo, SheetWarning } from '../types'
 
-export function parseJson(filePath: string, sheetName: string): SheetInfo {
+export function parseJson(filePath: string, sheetName: string): ParsedSheetInfo {
   const raw = fs.readFileSync(filePath, 'utf-8').trim()
   if (!raw) return emptyResult(sheetName, 'JSON file is empty.')
 
@@ -83,10 +83,11 @@ export function parseJson(filePath: string, sheetName: string): SheetInfo {
     warnings,
     classification: 'Unknown',
     classificationConfidence: 0,
+    allRows: rows,
   }
 }
 
-function emptyResult(sheetName: string, msg: string): SheetInfo {
+function emptyResult(sheetName: string, msg: string): ParsedSheetInfo {
   return {
     name: sheetName,
     rowCount: 0,
@@ -96,5 +97,6 @@ function emptyResult(sheetName: string, msg: string): SheetInfo {
     warnings: [{ type: 'empty_sheet', message: msg }],
     classification: 'Unknown',
     classificationConfidence: 0,
+    allRows: [],
   }
 }

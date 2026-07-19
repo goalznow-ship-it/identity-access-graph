@@ -63,6 +63,16 @@ describe('ImportsService - Limits', () => {
     assert.equal(goodFiles.length, 1)
     assert.equal(badFiles.length, 1)
   })
+
+  it('retains every parsed row while keeping the API preview bounded', async () => {
+    const service = new ImportsService()
+    const rows = Array.from({ length: 125 }, (_, index) => `${index + 1},User ${index + 1}`)
+    const session = await service.upload([makeFile('complete.csv', 'text/csv', `id,name\n${rows.join('\n')}`)])
+    const file = session.files[0]
+    assert.equal(file.sheets[0].previewRows.length, IMPORT_CONFIG.previewRows)
+    assert.equal((await service.getSheetRows(session.importId, file.id, 0)).length, 125)
+    assert.equal('allRows' in file.sheets[0], false)
+  })
 })
 
 describe('ImportsService - Progress', () => {
