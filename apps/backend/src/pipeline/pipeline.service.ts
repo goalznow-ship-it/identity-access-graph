@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common'
 import { PipelineEngine, type StageInput } from './pipeline-engine'
 import { allNodesFlat, relationships } from '../../../../packages/mock-data/src'
 import { OperationalStoreService } from '../database/operational-store.service'
+import { GraphService } from '../graph'
 
 function buildDefaultInput(): StageInput {
   return {
@@ -17,7 +18,7 @@ export class PipelineService implements OnModuleInit {
   private readonly engine: PipelineEngine
   private readonly defaultInput: StageInput
 
-  constructor(@Optional() private readonly store?: OperationalStoreService) {
+  constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly graph?: GraphService) {
     this.engine = new PipelineEngine({ idleDelayMs: 50 })
     this.defaultInput = buildDefaultInput()
     this.engine.seed(this.defaultInput)
@@ -31,7 +32,9 @@ export class PipelineService implements OnModuleInit {
 
   async start() {
     this.logger.log('Pipeline start requested')
-    const result = await this.engine.start(this.defaultInput); this.persist(); return result
+    const input = await this.loadInput()
+    this.engine.seed(input)
+    const result = await this.engine.start(input); this.persist(); return result
   }
 
   async pause() {
@@ -77,5 +80,17 @@ export class PipelineService implements OnModuleInit {
   private persist() {
     const state = this.engine.getState()
     this.store?.savePipeline({ id: state.id, status: state.status, payload: this.engine.persistenceState() as unknown as Record<string, unknown>, startedAt: state.startedAt ? new Date(state.startedAt) : null, completedAt: state.completedAt ? new Date(state.completedAt) : null })
+  }
+
+  private async loadInput(): Promise<StageInput> {
+    if (!this.graph?.isPersistenceEnabled()) return this.defaultInput
+    const [nodes, relationships] = await Promise.all([this.graph.exportNodes(), this.graph.exportRelationships()])
+    const input = {
+      nodes: nodes.items as unknown as Record<string, unknown>[],
+      relationships: relationships.items.map((item) => item.relationship) as unknown as Record<string, unknown>[],
+      metadata: { source: 'neo4j', nodeCount: nodes.items.length, relationshipCount: relationships.items.length, nodesTruncated: nodes.truncated, relationshipsTruncated: relationships.truncated },
+    }
+    this.logger.log(`Loaded pipeline snapshot from Neo4j with ${input.nodes.length} nodes and ${input.relationships.length} relationships`)
+    return input
   }
 }

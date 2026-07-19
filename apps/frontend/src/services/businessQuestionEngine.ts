@@ -1058,7 +1058,7 @@ export function executeQuestion(questionId: string, input?: string): QuestionRes
       result = queryAppUserCount()
       break
     default:
-      result = makeResult(questionId, 'Unknown question', 'Question not implemented.')
+      result = makeResult(questionId, 'Unknown question', 'The requested question identifier is not in the published catalog.')
   }
 
   resultCache.set(cacheKey, result)

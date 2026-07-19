@@ -35,7 +35,7 @@ export function PipelinePage() {
       <div>
         <h1 className="text-2xl font-semibold text-gray-100">Pipeline Operations</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Run and inspect the current identity-resolution pipeline. This workspace uses the built-in demonstration dataset until a persisted graph source is selected.
+          Run and inspect identity extraction, normalization, matching, graph construction, and scheduling. Runs use an authoritative Neo4j snapshot when graph persistence is enabled.
         </p>
       </div>
 

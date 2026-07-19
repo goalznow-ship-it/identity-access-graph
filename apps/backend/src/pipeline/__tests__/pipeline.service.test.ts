@@ -18,6 +18,19 @@ describe('PipelineService', () => {
     assert.strictEqual(result.completedStages.length, PIPELINE_STAGES_ORDER.length)
   })
 
+  it('should load the authoritative Neo4j snapshot for each full run', async () => {
+    const graph = {
+      isPersistenceEnabled: () => true,
+      exportNodes: async () => ({ items: [{ id: 'neo-user', nodeType: 'USER', properties: {} }], truncated: false }),
+      exportRelationships: async () => ({ items: [{ relationship: { id: 'neo-edge', source: 'neo-user', target: 'neo-app', relationshipType: 'USES' } }], truncated: false }),
+    }
+    const service = new PipelineService(undefined, graph as any)
+    await service.start()
+    const first = service.getSnapshots()[0]
+    assert.strictEqual(first.result.inputCount, 1)
+    assert.strictEqual(first.output.metadata.source, 'neo4j')
+  })
+
   it('should support next/previous step-by-step', async () => {
     const service = new PipelineService()
 
