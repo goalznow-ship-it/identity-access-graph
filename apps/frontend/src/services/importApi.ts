@@ -14,7 +14,7 @@ import type {
   ImportPersistenceSummary,
 } from '../types/import'
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const API_BASE = ((import.meta as any).env?.VITE_API_URL || '').replace(/\/$/, '')
 
 export class ImportApiError extends Error {
   constructor(message: string, public readonly status: number) { super(message); this.name = 'ImportApiError' }

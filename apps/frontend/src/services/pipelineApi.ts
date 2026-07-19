@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+const BASE_URL = ((import.meta as any).env?.VITE_API_URL ?? '').replace(/\/$/, '')
 
 class PipelineApiError extends Error {
   constructor(
