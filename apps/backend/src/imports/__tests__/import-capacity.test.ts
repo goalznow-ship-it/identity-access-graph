@@ -34,6 +34,7 @@ describe('Import Config', () => {
   it('should provide reasonable defaults', () => {
     assert.equal(IMPORT_CONFIG.maxFilesPerSession, 50)
     assert.equal(IMPORT_CONFIG.maxRowsPerSheet, 500_000)
+    assert.equal(IMPORT_CONFIG.maxRowsPerFile, 10_000_000)
     assert.equal(IMPORT_CONFIG.chunkSizeRows, 5_000)
     assert.equal(IMPORT_CONFIG.previewRows, 100)
   })

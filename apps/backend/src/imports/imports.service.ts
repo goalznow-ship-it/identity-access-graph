@@ -308,10 +308,17 @@ export class ImportsService implements OnModuleInit {
     await saveCheckpoint({ phase: 'parsing', fileId: file.id, rowsProcessed: file.progress?.rowsProcessed ?? 0 })
     const ext = path.extname(file.originalName).toLowerCase()
     if (this.chunks && file.filePath && ['.csv', '.xlsx', '.xls'].includes(ext)) {
+      const startedAt = Date.now()
       const callbacks = {
         resumeRows: Number(job.checkpoint.rowsProcessed ?? 0),
         onChunk: (sheetIndex: number, chunkIndex: number, rowStart: number, rows: Record<string, unknown>[]) => this.chunks!.append(job.importId, job.fileId, sheetIndex, chunkIndex, rowStart, rows),
-        onProgress: saveCheckpoint,
+        onProgress: async (checkpoint: Record<string, unknown>) => {
+          const rowsProcessed = Number(checkpoint.rowsProcessed ?? 0), elapsedMs = Math.max(1, Date.now() - startedAt)
+          file.progress = { phase: 'parsing', percent: 0, rowsProcessed, totalRows: 0, throughput: Math.round(rowsProcessed / (elapsedMs / 1000)), elapsedMs, estimatedRemainingMs: 0 }
+          session.progress = { ...session.progress!, status: 'parsing', currentFileId: file.id, rowsProcessed: session.files.reduce((sum, item) => sum + Number(item.progress?.rowsProcessed ?? 0), 0), throughput: file.progress.throughput, elapsedMs: Date.now() - session.createdAt }
+          this.persistSnapshot(job.importId)
+          await Promise.all([saveCheckpoint(checkpoint), this.store?.flush()])
+        },
         isCancelled: () => Boolean(session.cancelled || this.cancelledSessions.has(job.importId)),
       }
       const parsed = ext === '.csv' ? [await parseCsvChunked(file.filePath, file.originalName.replace(ext, ''), callbacks)] : await parseExcelChunked(file.filePath, callbacks)

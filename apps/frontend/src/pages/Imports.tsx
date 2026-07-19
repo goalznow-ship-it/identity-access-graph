@@ -183,7 +183,7 @@ export function ImportsPage() {
   }, [session?.importId, loadingSession, selectedFile?.id, sheetIndex])
 
   useEffect(() => {
-    if (session?.files.length && effectiveStep === 'upload' && !loadingSession) {
+    if (session?.files.some((file) => file.sheets.length > 0) && effectiveStep === 'upload' && !loadingSession) {
       const first = session.files[0]
       setSelectedFile(first)
       setSelectedSheet(first.sheets[0] ?? null)

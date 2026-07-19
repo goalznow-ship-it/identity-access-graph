@@ -11,7 +11,7 @@ const envInt = (key: string, fallback: number): number => {
 export const IMPORT_CONFIG = {
   maxFileSizeBytes: envInt('IMPORT_MAX_FILE_SIZE_MB', 250) * 1024 * 1024,
   maxFilesPerSession: envInt('IMPORT_MAX_FILES_PER_SESSION', 50),
-  maxRowsPerFile: envInt('IMPORT_MAX_ROWS_PER_FILE', 1_000_000),
+  maxRowsPerFile: envInt('IMPORT_MAX_ROWS_PER_FILE', 10_000_000),
   maxRowsPerSheet: envInt('IMPORT_MAX_ROWS_PER_SHEET', 500_000),
   maxSheetsPerWorkbook: envInt('IMPORT_MAX_SHEETS_PER_WORKBOOK', 100),
   previewRows: envInt('IMPORT_PREVIEW_ROWS', 100),

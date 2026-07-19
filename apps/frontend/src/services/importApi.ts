@@ -41,7 +41,7 @@ export async function uploadFiles(files: File[]): Promise<ImportSession> {
   const form = new FormData()
   for (const f of files) form.append('files', f)
 
-  const res = await fetch(`${API_BASE}/imports/upload`, {
+  const res = await fetch(`${API_BASE}/imports/upload-async`, {
     method: 'POST',
     body: form,
   })
@@ -53,6 +53,15 @@ export async function uploadFiles(files: File[]): Promise<ImportSession> {
 
   return res.json()
 }
+
+export async function getImportHistory(limit = 50, offset = 0) {
+  return apiFetch<{ total: number; limit: number; offset: number; imports: ImportSession[] }>(`/imports/history?limit=${limit}&offset=${offset}`)
+}
+
+export async function getImportAudit(importId: string) { return apiFetch<any[]>(`/imports/${importId}/audit`) }
+export async function getImportStatistics(importId: string) { return apiFetch<Record<string, unknown>>(`/imports/${importId}/statistics`) }
+export async function getValidationReport(importId: string) { return apiFetch<{ importId: string; summary: ValidationResult['summary']; issues: ValidationResult['issues'] }>(`/imports/${importId}/validation-report`) }
+export function getErrorReportUrl(importId: string) { return `${API_BASE}/imports/${importId}/error-report.csv` }
 
 export async function getActiveImportSession(): Promise<ImportSession> {
   return apiFetch<ImportSession>('/imports/active')

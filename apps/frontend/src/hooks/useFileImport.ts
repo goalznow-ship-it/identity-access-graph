@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { ImportSession, SessionProgress, ImportLimits, PendingFile, DatasetType } from '../types/import'
-import { uploadFiles, classifySheet, getImportLimits, getImportProgress, cancelImport, retryFile, removeFileFromSession } from '../services/importApi'
+import { uploadFiles, classifySheet, getImportLimits, getImportProgress, getSession, cancelImport, retryFile, removeFileFromSession } from '../services/importApi'
 
 const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -32,6 +32,10 @@ export function useFileImport() {
           const p = await getImportProgress(session.importId)
           setProgress(p)
           if (p.status === 'completed' || p.status === 'cancelled' || p.status === 'failed') {
+            if (p.status === 'completed') {
+              const completed = await getSession(session.importId)
+              setSession(completed)
+            }
             if (pollRef.current) clearInterval(pollRef.current)
           }
         } catch {
