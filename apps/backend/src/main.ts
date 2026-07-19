@@ -5,7 +5,7 @@ import { AppModule } from './app/app.module'
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap')
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create(AppModule, { abortOnError: false })
 
   app.enableCors({
     origin: [
@@ -41,4 +41,10 @@ async function bootstrap() {
   logger.log(`Application running on http://localhost:${port}`)
   logger.log(`Swagger docs at http://localhost:${port}/api/docs`)
 }
-bootstrap()
+bootstrap().catch((error: unknown) => {
+  const logger = new Logger('Bootstrap')
+  const message = error instanceof Error ? error.message : String(error)
+  logger.error(`Backend startup failed: ${message}`)
+  logger.error('Verify DATABASE_URL points to an available PostgreSQL database and that migrations can be applied.')
+  process.exitCode = 1
+})

@@ -14,3 +14,7 @@ A platform for modeling, visualizing, and managing complex identity and access r
 | `docs` | Documentation |
 | `docker` | Docker configuration files |
 | `scripts` | Utility scripts |
+
+## PostgreSQL
+
+PostgreSQL is required for backend runtime state. See [docs/POSTGRESQL.md](docs/POSTGRESQL.md) for local setup, migrations, health checks, and integration-test commands.
