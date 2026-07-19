@@ -9,6 +9,7 @@ import { RiskModule } from '../risk'
 import { AttackPathModule } from '../attack-path'
 import { ConnectorsModule } from '../connectors'
 import { IdentityModule } from '../identity'
+import { DatabaseModule } from '../database/database.module'
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { IdentityModule } from '../identity'
       isGlobal: true,
       load: [envConfig],
     }),
+    DatabaseModule,
     Neo4jModule,
     HealthModule,
     PipelineModule,
