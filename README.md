@@ -30,3 +30,5 @@ Enterprise attack-path discovery, blast radius, choke points, history, exports, 
 Durable operational alerts and the notification center are documented in [docs/ENTERPRISE_NOTIFICATIONS.md](docs/ENTERPRISE_NOTIFICATIONS.md).
 
 Shared workspace configuration and settings audit history are documented in [docs/ENTERPRISE_ADMINISTRATION.md](docs/ENTERPRISE_ADMINISTRATION.md).
+
+Neo4j-backed identity, group, access, and relationship inventory contracts are documented in [docs/ENTERPRISE_EXPLORERS.md](docs/ENTERPRISE_EXPLORERS.md).
