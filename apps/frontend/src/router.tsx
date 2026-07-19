@@ -12,6 +12,7 @@ const GraphPage = lazyPage(() => import('./pages/Graph'), 'GraphPage')
 const IdentitiesPage = lazyPage(() => import('./pages/Identities'), 'IdentitiesPage')
 const UserProfilePage = lazyPage(() => import('./pages/UserProfile'), 'UserProfilePage')
 const GroupsPage = lazyPage(() => import('./pages/Groups'), 'GroupsPage')
+const RelationshipsPage = lazyPage(() => import('./pages/Relationships'), 'RelationshipsPage')
 const AccessPage = lazyPage(() => import('./pages/Access'), 'AccessPage')
 const SettingsPage = lazyPage(() => import('./pages/Settings'), 'SettingsPage')
 const RiskFindingsPage = lazyPage(() => import('./pages/RiskFindings'), 'RiskFindingsPage')
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: '/identities', element: page(<IdentitiesPage />) },
       { path: '/identities/:userId', element: page(<UserProfilePage />) },
       { path: '/groups', element: page(<GroupsPage />) },
+      { path: '/relationships', element: page(<RelationshipsPage />) },
       { path: '/access', element: page(<AccessPage />) },
       { path: '/access/policies', element: page(<AccessPage />) },
       { path: '/access/roles', element: page(<AccessPage />) },

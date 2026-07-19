@@ -54,6 +54,7 @@ const menuGroups: MenuGroup[] = [
         children: [
           { label: 'All Identities', path: '/identities' },
           { label: 'Groups', path: '/groups' },
+          { label: 'Relationships', path: '/relationships' },
         ],
       },
       {
