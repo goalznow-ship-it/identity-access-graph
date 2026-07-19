@@ -28,9 +28,11 @@ describe('enterprise graph Neo4j integration', { skip: databaseUrl && neo4jUri ?
   it('versions incremental updates, traverses, snapshots, diffs, and calculates statistics', async () => {
     const first = await graph.apply({ source: 'integration', nodes: [node('a'), node('b'), node('c')], relationships: [relationship('ab', 'a', 'b'), relationship('bc', 'b', 'c')] })
     assert.equal(first.counts.nodesAdded, 3); assert.equal(first.counts.relationshipsAdded, 2)
+    const persistedVersion = await neo4j.read('MATCH (n:GraphNode {id:$id}) RETURN n.graphVersion AS version', { id: 'a' })
+    assert.equal(persistedVersion.records[0].get('version'), String(first.sequence))
     const snapshotOne = await graph.createSnapshot('before')
     assert.equal((await graph.shortestPath('a', 'c'))?.depth, 2)
-    assert.equal((await graph.blastRadius('a', 3)).affected, 2)
+    const radius = await graph.blastRadius('a', 3); assert.equal(radius.affected, 2); assert.equal(radius.nodes[0].depth, 1)
 
     const second = await graph.apply({ source: 'integration', nodes: [{ ...node('b'), displayName: 'Updated b' }, node('d')], relationships: [relationship('bd', 'b', 'd')], deleteNodeIds: ['c'], deleteRelationshipIds: ['bc'] })
     assert.ok(BigInt(second.sequence) > BigInt(first.sequence))
