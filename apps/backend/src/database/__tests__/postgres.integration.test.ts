@@ -156,6 +156,11 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
     assert.equal((await queue.jobsFor(importId))[0].status, 'COMPLETED')
     assert.deepEqual((await queue.jobsFor(importId))[0].checkpoint, { row: 5000 })
     assert.deepEqual((await queue.auditFor(importId)).map((entry) => entry.event), ['JOB_QUEUED', 'JOB_COMPLETED'])
+    const cancelled = await queue.enqueue(importId, randomUUID()), active = await queue.claim('worker-c')
+    assert.equal(active?.id, cancelled.id)
+    await queue.cancel(importId)
+    await queue.fail(active!, new Error('worker observed cancellation'))
+    assert.equal((await queue.jobsFor(importId)).find((job) => job.id === cancelled.id)?.status, 'CANCELLED')
   })
 
   it('builds durable history, validation, duplicate, error, and statistics reports', async () => {

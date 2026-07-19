@@ -43,6 +43,8 @@ export class ImportQueueService {
   }
 
   async fail(job: ImportJobEntity, error: Error) {
+    const current = await this.jobs.findOneBy({ id: job.id })
+    if (current?.status === 'CANCELLED') return
     const retry = job.attempts < job.maxAttempts
     const delay = IMPORT_CONFIG.retryBaseDelayMs * 2 ** Math.max(0, job.attempts - 1)
     await this.jobs.update(job.id, { status: retry ? 'RETRY' : 'FAILED', error: error.message, lockedAt: null, lockedBy: null, nextAttemptAt: new Date(Date.now() + delay), completedAt: retry ? null : new Date() })
