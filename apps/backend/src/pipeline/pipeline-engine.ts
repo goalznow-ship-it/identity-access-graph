@@ -28,6 +28,7 @@ export class PipelineEngine {
   private config: PipelineConfig
   private snapshots: StageSnapshot[] = []
   private currentOutput: StageOutput | null = null
+  private initialInput: StageInput | null = null
   private timerId: ReturnType<typeof setTimeout> | null = null
   private executionId = 0
 
@@ -64,6 +65,7 @@ export class PipelineEngine {
     this.run.errors = []
     this.run.warnings = []
     this.snapshots = []
+    this.initialInput = initialData
     this.currentOutput = initialData
 
     return this.executeRemainingStages(0)
@@ -95,7 +97,7 @@ export class PipelineEngine {
 
       let result: StageResult & { output: StageOutput }
       try {
-        result = await handler(input, stage)
+        result = await this.runStage(handler(input, stage), stage)
       } catch (err) {
         this.run.status = PipelineStatus.Failed
         this.run.errors.push(`Stage ${stage} threw: ${(err as Error).message}`)
@@ -162,6 +164,7 @@ export class PipelineEngine {
   }
 
   seed(data: StageInput): void {
+    this.initialInput = data
     this.currentOutput = data
   }
 
@@ -183,7 +186,7 @@ export class PipelineEngine {
 
     const handler = stageHandlers[PIPELINE_STAGES_ORDER[startIndex]]
     const input: StageInput = this.currentOutput!
-    const result = await handler(input, PIPELINE_STAGES_ORDER[startIndex])
+    const result = await this.runStage(handler(input, PIPELINE_STAGES_ORDER[startIndex]), PIPELINE_STAGES_ORDER[startIndex])
 
     this.snapshots.push({ stage: PIPELINE_STAGES_ORDER[startIndex], result, output: result.output })
     this.run.completedStages.push(PIPELINE_STAGES_ORDER[startIndex])
@@ -218,7 +221,7 @@ export class PipelineEngine {
     const prevStage = this.run.completedStages.pop()
     this.currentOutput = this.snapshots.length > 0
       ? this.snapshots[this.snapshots.length - 1].output
-      : { nodes: [], relationships: [], metadata: {} }
+      : this.initialInput
 
     this.run.currentStage = prevStage ?? PIPELINE_STAGES_ORDER[0]
     this.run.progress = Math.round((this.run.completedStages.length / PIPELINE_STAGES_ORDER.length) * 100)
@@ -230,13 +233,13 @@ export class PipelineEngine {
     if (this.run.completedStages.length === 0) {
       throw new Error('No completed stages to replay')
     }
-    if (!this.currentOutput) {
+    if (!this.initialInput) {
       throw new Error('No initial data to replay from')
     }
 
-    const initialOutput = this.snapshots.length > 0 ? this.snapshots[0].output : this.currentOutput
+    const initialInput = this.initialInput
     this.reset()
-    return this.start(initialOutput)
+    return this.start(initialInput)
   }
 
   reset(): void {
@@ -248,6 +251,7 @@ export class PipelineEngine {
     this.run = this.createInitialRun()
     this.snapshots = []
     this.currentOutput = null
+    this.initialInput = null
   }
 
   getState(): PipelineRun {
@@ -262,5 +266,13 @@ export class PipelineEngine {
     return new Promise((resolve) => {
       this.timerId = setTimeout(resolve, ms)
     })
+  }
+
+  private runStage<T>(stagePromise: Promise<T>, stage: PipelineStage): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout>
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`Stage ${stage} timed out after ${this.config.stageTimeoutMs}ms`)), this.config.stageTimeoutMs)
+    })
+    return Promise.race([stagePromise, timeout]).finally(() => clearTimeout(timeoutId))
   }
 }

@@ -105,6 +105,16 @@ describe('PipelineEngine', () => {
     assert.ok(engine.getSnapshots().length >= originalSnapshots)
   })
 
+  it('should restore the original input when stepping back to the first stage', async () => {
+    const engine = new PipelineEngine({ idleDelayMs: 0 })
+    const input = makeInput()
+    engine.seed(input)
+    await engine.nextStage()
+    await engine.previousStage()
+    const extraction = await engine.nextStage()
+    assert.strictEqual(extraction?.result.inputCount, input.nodes.length)
+  })
+
   it('should fail validation on missing target nodes', async () => {
     const engine = new PipelineEngine({ idleDelayMs: 5 })
 
