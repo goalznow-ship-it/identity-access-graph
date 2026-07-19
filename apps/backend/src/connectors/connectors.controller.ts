@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { optionalInteger } from '../common/http-validation'
 import { validateConnectorCreate, validateConnectorUpdate, validateSyncOptions } from './connector-validation'
 import { ConnectorsService } from './connectors.service'
@@ -9,7 +9,13 @@ export class ConnectorsController {
   @Get() list() { return this.connectors.list() }
   @Post() create(@Body() body: unknown) { return this.connectors.create(validateConnectorCreate(body)) }
   @Get(':id') get(@Param('id') id: string) { return this.connectors.get(id) }
-  @Patch(':id') update(@Param('id') id: string, @Body() body: unknown) { return this.connectors.update(id, validateConnectorUpdate(body)) }
+  @Patch(':id') update(@Param('id') id: string, @Body() body: unknown) {
+    const update = validateConnectorUpdate(body)
+    if (update.connectorType && update.connectorType !== this.connectors.get(id).connectorType) {
+      throw new BadRequestException('Connector type cannot be changed after creation')
+    }
+    return this.connectors.update(id, update)
+  }
   @Delete(':id') delete(@Param('id') id: string) { return this.connectors.delete(id) }
   @Post(':id/test') test(@Param('id') id: string) { return this.connectors.test(id) }
   @Post(':id/preview') preview(@Param('id') id: string, @Query('limit') limit?: string) { return this.connectors.preview(id, optionalInteger(limit, 'limit', { min: 1, max: 500 }) ?? 100) }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { validateConnectorCreate, validateConnectorUpdate, validateSyncOptions } from '../connector-validation'
+import { ConnectorsController } from '../connectors.controller'
 
 describe('connector API mutation validation', () => {
   it('rejects invalid connector types and internal fields', () => {
@@ -20,5 +21,14 @@ describe('connector API mutation validation', () => {
     assert.throws(() => validateSyncOptions({ previewLimit: 501 }), /between 1 and 500/)
     assert.throws(() => validateSyncOptions({ unexpected: true }), /Unknown sync option/)
     assert.deepEqual(validateSyncOptions({ mode: 'FULL', convert: true, persist: true, runRiskScan: true }), { mode: 'FULL', convert: true, persist: true, runRiskScan: true })
+  })
+
+  it('prevents changing the connector implementation after creation', () => {
+    const service = {
+      get: () => ({ connectorType: 'ACTIVE_DIRECTORY' }),
+      update: () => { throw new Error('must not update') },
+    }
+    const controller = new ConnectorsController(service as any)
+    assert.throws(() => controller.update('connector-1', { connectorType: 'ENTRA_ID' }), /cannot be changed/)
   })
 })
