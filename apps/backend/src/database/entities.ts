@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm'
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
 
 @Entity('connectors')
 export class ConnectorEntity {
@@ -89,4 +89,62 @@ export class OperationalMetadataEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' }) updatedAt!: Date
 }
 
-export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, AttackPathEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity]
+@Entity('import_jobs')
+@Index(['status', 'nextAttemptAt'])
+export class ImportJobEntity {
+  @PrimaryColumn('uuid') id!: string
+  @Index() @Column('uuid', { name: 'import_id' }) importId!: string
+  @Column('uuid', { name: 'file_id' }) fileId!: string
+  @Column({ type: 'varchar', length: 32 }) status!: string
+  @Column({ type: 'integer', default: 0 }) attempts!: number
+  @Column({ name: 'max_attempts', type: 'integer', default: 3 }) maxAttempts!: number
+  @Column({ type: 'jsonb', default: {} }) checkpoint!: Record<string, unknown>
+  @Column({ type: 'text', nullable: true }) error!: string | null
+  @Column({ name: 'locked_by', type: 'varchar', length: 128, nullable: true }) lockedBy!: string | null
+  @Column({ name: 'locked_at', type: 'timestamptz', nullable: true }) lockedAt!: Date | null
+  @Column({ name: 'next_attempt_at', type: 'timestamptz', default: () => 'now()' }) nextAttemptAt!: Date
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' }) updatedAt!: Date
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true }) completedAt!: Date | null
+}
+
+@Entity('import_row_chunks')
+@Index(['importId', 'fileId', 'sheetIndex', 'chunkIndex'], { unique: true })
+export class ImportRowChunkEntity {
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' }) id!: string
+  @Column('uuid', { name: 'import_id' }) importId!: string
+  @Column('uuid', { name: 'file_id' }) fileId!: string
+  @Column({ name: 'sheet_index', type: 'integer' }) sheetIndex!: number
+  @Column({ name: 'chunk_index', type: 'integer' }) chunkIndex!: number
+  @Column({ name: 'row_start', type: 'integer' }) rowStart!: number
+  @Column({ name: 'row_end', type: 'integer' }) rowEnd!: number
+  @Column({ type: 'jsonb' }) rows!: Record<string, unknown>[]
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
+}
+
+@Entity('import_audit_log')
+@Index(['importId', 'createdAt'])
+export class ImportAuditLogEntity {
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' }) id!: string
+  @Column('uuid', { name: 'import_id' }) importId!: string
+  @Column({ type: 'varchar', length: 64 }) event!: string
+  @Column({ type: 'varchar', length: 128, default: 'system' }) actor!: string
+  @Column({ type: 'jsonb', default: {} }) details!: Record<string, unknown>
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
+}
+
+@Entity('import_validation_issues')
+@Index(['importId', 'severity'])
+export class ImportValidationIssueEntity {
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' }) id!: string
+  @Column('uuid', { name: 'import_id' }) importId!: string
+  @Column('uuid', { name: 'file_id' }) fileId!: string
+  @Column({ name: 'sheet_index', type: 'integer' }) sheetIndex!: number
+  @Column({ type: 'integer' }) row!: number
+  @Column({ type: 'varchar', length: 32 }) severity!: string
+  @Column({ type: 'varchar', length: 128 }) code!: string
+  @Column({ type: 'jsonb' }) payload!: Record<string, unknown>
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
+}
+
+export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, AttackPathEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity]

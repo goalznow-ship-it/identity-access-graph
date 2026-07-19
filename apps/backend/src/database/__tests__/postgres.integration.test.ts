@@ -18,6 +18,7 @@ import {
   RiskFindingEntity,
 } from '../entities'
 import { InitialOperationalPersistence1721380800000 } from '../migrations/1721380800000-InitialOperationalPersistence'
+import { EnterpriseImportEngine1721467200000 } from '../migrations/1721467200000-EnterpriseImportEngine'
 import { OperationalStoreService } from '../operational-store.service'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
@@ -47,7 +48,7 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
       type: 'postgres',
       url: databaseUrl,
       entities: DATABASE_ENTITIES,
-      migrations: [InitialOperationalPersistence1721380800000],
+      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000],
       synchronize: false,
     })
     await dataSource.initialize()
@@ -70,12 +71,12 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
 
   it('runs the versioned migration once and supports rollback and re-apply', async () => {
     const firstRun = await dataSource.runMigrations({ transaction: 'all' })
-    assert.equal(firstRun.length, 1)
+    assert.equal(firstRun.length, 2)
     assert.equal(await dataSource.getRepository(ConnectorEntity).count(), 0)
     assert.equal((await dataSource.runMigrations({ transaction: 'all' })).length, 0)
 
     await dataSource.undoLastMigration({ transaction: 'all' })
-    const tableAfterRollback = await dataSource.query(`SELECT to_regclass('public.connectors') AS name`)
+    const tableAfterRollback = await dataSource.query(`SELECT to_regclass('public.import_jobs') AS name`)
     assert.equal(tableAfterRollback[0].name, null)
     assert.equal((await dataSource.runMigrations({ transaction: 'all' })).length, 1)
   })

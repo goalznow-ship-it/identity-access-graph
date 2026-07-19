@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { DATABASE_ENTITIES } from './entities'
 import { InitialOperationalPersistence1721380800000 } from './migrations/1721380800000-InitialOperationalPersistence'
+import { EnterpriseImportEngine1721467200000 } from './migrations/1721467200000-EnterpriseImportEngine'
 import { DatabaseHealthService } from './database-health.service'
 import { OperationalStoreService } from './operational-store.service'
 
@@ -18,7 +19,7 @@ import { OperationalStoreService } from './operational-store.service'
           type: 'postgres' as const,
           url,
           entities: DATABASE_ENTITIES,
-          migrations: [InitialOperationalPersistence1721380800000],
+          migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000],
           migrationsRun: true,
           synchronize: false,
           connectTimeoutMS: config.get<number>('database.connectTimeoutMs') ?? 5000,
