@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import type { LinuxHostDetail, EffectiveAccessEntry, ReverseAccessSummary, DependencyNode, LinuxRiskFinding } from '../types/linux'
 import { getHostDetail, computeEffectiveAccess, computeReverseAccessSummary, computeDependencyNodes, computeRiskFindingsForHost } from '../services/linuxGraphAdapter'
 
-export function useLinuxHostAccess(hostId: string | null) {
+export function useLinuxHostAccess(hostId: string | null, graphRevision = 0) {
   const [detail, setDetail] = useState<LinuxHostDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,27 +26,27 @@ export function useLinuxHostAccess(hostId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [hostId])
+  }, [hostId, graphRevision])
 
   const effectiveAccess = useMemo((): EffectiveAccessEntry[] => {
     if (!hostId) return []
     return computeEffectiveAccess(hostId)
-  }, [hostId])
+  }, [hostId, graphRevision])
 
   const reverseAccess = useMemo((): ReverseAccessSummary | null => {
     if (!hostId) return null
     return computeReverseAccessSummary(hostId)
-  }, [hostId])
+  }, [hostId, graphRevision])
 
   const dependencies = useMemo((): DependencyNode[] => {
     if (!hostId) return []
     return computeDependencyNodes(hostId)
-  }, [hostId])
+  }, [hostId, graphRevision])
 
   const riskFindings = useMemo((): LinuxRiskFinding[] => {
     if (!hostId) return []
     return computeRiskFindingsForHost(hostId)
-  }, [hostId])
+  }, [hostId, graphRevision])
 
   return {
     detail, loading, error,

@@ -3,14 +3,9 @@ import type {
   UserIdentity, CorrelatedIdentity, Membership,
   EffectiveAccess, AccessPath, PathNode, RiskFinding, UserProfileData,
 } from '../types/identity'
-import mockData from './mockGraphData.json'
-
-let graphData: GraphData | null = null
+let graphData: GraphData = { nodes: [], links: [] }
 
 function getData(): GraphData {
-  if (!graphData) {
-    graphData = mockData as unknown as GraphData
-  }
   return graphData
 }
 

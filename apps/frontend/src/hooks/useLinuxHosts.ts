@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import type { LinuxHostSummary, LinuxHostFilters } from '../types/linux'
 import { getLinuxHostsByFilter } from '../services/linuxGraphAdapter'
 
-export function useLinuxHosts(filters: LinuxHostFilters, search: string) {
+export function useLinuxHosts(filters: LinuxHostFilters, search: string, graphRevision = 0) {
   const [hosts, setHosts] = useState<LinuxHostSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +29,7 @@ export function useLinuxHosts(filters: LinuxHostFilters, search: string) {
     filters.hasApplication,
     filters.hasDatabase,
     search,
+    graphRevision,
   ])
 
   const uniqueEnvironments = useMemo(() => {

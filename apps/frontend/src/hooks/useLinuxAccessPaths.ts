@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { AccessPathEntry } from '../types/linux'
 import { computeEffectiveAccess } from '../services/linuxGraphAdapter'
 
-export function useLinuxAccessPaths(hostId: string | null) {
+export function useLinuxAccessPaths(hostId: string | null, graphRevision = 0) {
   const allPaths = useMemo((): AccessPathEntry[] => {
     if (!hostId) return []
     const entries = computeEffectiveAccess(hostId)
@@ -13,7 +13,7 @@ export function useLinuxAccessPaths(hostId: string | null) {
       }
     }
     return paths
-  }, [hostId])
+  }, [hostId, graphRevision])
 
   const uniqueNodes = useMemo(() => {
     const map = new Map<string, { id: string; displayName: string; nodeType: string }>()

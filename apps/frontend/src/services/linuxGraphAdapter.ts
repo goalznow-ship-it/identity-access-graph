@@ -5,15 +5,15 @@ import type {
   SshKeyAccess, EffectiveAccessEntry, ReverseAccessSummary,
   DependencyNode, LinuxRiskFinding, AccessPathEntry,
 } from '../types/linux'
-import mockData from './mockGraphData.json'
-
-let graphData: GraphData | null = null
+let graphData: GraphData = { nodes: [], links: [] }
 
 function getData(): GraphData {
-  if (!graphData) {
-    graphData = mockData as unknown as GraphData
-  }
   return graphData
+}
+
+export function setLinuxGraphData(data: GraphData): void {
+  graphData = data
+  clearCache()
 }
 
 export function getNodeById(id: string): GraphNode | undefined {

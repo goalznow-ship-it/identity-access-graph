@@ -5,6 +5,8 @@ import { Tabs } from '../components/ui/Tabs'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Card } from '../components/ui/Card'
 import { useUserProfile } from '../hooks/useUserProfile'
+import { useGraphSource } from '../hooks/useGraphSource'
+import { useGraphData } from '../hooks/useGraphData'
 import {
   UserProfileHeader,
   IdentitySources,
@@ -18,7 +20,10 @@ import {
 export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const navigate = useNavigate()
-  const { profile, loading, error } = useUserProfile(userId)
+  const { source } = useGraphSource()
+  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
+  const graph = useGraphData(source === 'imported' ? importId : null, source)
+  const { profile, loading, error } = useUserProfile(userId, graph.data, graph.loading, graph.error)
 
   if (loading) {
     return (
@@ -34,10 +39,10 @@ export function UserProfilePage() {
         <Card className="p-6 text-center">
           <p className="text-danger">{error}</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={graph.error ? () => void graph.retry() : () => navigate(-1)}
             className="mt-4 text-sm text-primary hover:underline"
           >
-            Go back
+            {graph.error ? 'Retry graph loading' : 'Go back'}
           </button>
         </Card>
       </div>

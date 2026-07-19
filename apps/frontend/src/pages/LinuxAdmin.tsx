@@ -14,6 +14,9 @@ import {
 import { useLinuxHosts } from '../hooks/useLinuxHosts'
 import { useLinuxHostAccess } from '../hooks/useLinuxHostAccess'
 import { useLinuxAccessPaths } from '../hooks/useLinuxAccessPaths'
+import { useGraphSource } from '../hooks/useGraphSource'
+import { useGraphData } from '../hooks/useGraphData'
+import { setLinuxGraphData } from '../services/linuxGraphAdapter'
 import type { LinuxHostFilters, LinuxAdminTab } from '../types/linux'
 import { Terminal, Server, Users, Key, Shield, GitBranch, AlertTriangle, Activity } from 'lucide-react'
 
@@ -32,6 +35,10 @@ function TabButton({ active, icon: Icon, label, onClick }: { active: boolean; ic
 }
 
 export function LinuxAdminPage() {
+  const { source } = useGraphSource()
+  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
+  const graph = useGraphData(source === 'imported' ? importId : null, source)
+  const [graphRevision, setGraphRevision] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const initialHostId = searchParams.get('hostId')
   const [selectedHostId, setSelectedHostId] = useState<string | null>(initialHostId)
@@ -49,9 +56,15 @@ export function LinuxAdminPage() {
     hasDatabase: '',
   })
 
-  const { hosts, loading, error, uniqueEnvironments, uniqueOperatingSystems, uniqueSourceSystems } = useLinuxHosts(filters, search)
-  const { detail, loading: detailLoading, reverseAccess, dependencies, riskFindings } = useLinuxHostAccess(selectedHostId)
-  const { allPaths } = useLinuxAccessPaths(selectedHostId)
+  useEffect(() => {
+    if (!graph.data) return
+    setLinuxGraphData(graph.data)
+    setGraphRevision((revision) => revision + 1)
+  }, [graph.data])
+
+  const { hosts, loading, error, uniqueEnvironments, uniqueOperatingSystems, uniqueSourceSystems } = useLinuxHosts(filters, search, graphRevision)
+  const { detail, loading: detailLoading, reverseAccess, dependencies, riskFindings } = useLinuxHostAccess(selectedHostId, graphRevision)
+  const { allPaths } = useLinuxAccessPaths(selectedHostId, graphRevision)
 
   useEffect(() => {
     if (initialHostId) setSelectedHostId(initialHostId)
@@ -63,13 +76,29 @@ export function LinuxAdminPage() {
     setSearchParams({ hostId })
   }, [setSearchParams])
 
+  if (graph.loading) {
+    return <div className="flex h-full items-center justify-center"><LoadingSpinner size="lg" /></div>
+  }
+
+  if (graph.error) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <EmptyState
+          title="Linux graph unavailable"
+          description={graph.error}
+          action={<button onClick={() => void graph.retry()} className="rounded-lg bg-primary px-3 py-2 text-sm text-white">Retry</button>}
+        />
+      </div>
+    )
+  }
+
   if (!selectedHostId) {
     return (
       <div className="flex h-full">
         <div className="flex w-80 shrink-0 flex-col border-r border-border p-4">
           <div className="mb-4">
             <h1 className="text-base font-semibold text-gray-100">Linux Admin</h1>
-            <p className="text-xs text-gray-500">Select a host to manage</p>
+            <p className="text-xs text-gray-500">Select a host from {source === 'neo4j' ? 'Neo4j Live' : source === 'imported' ? 'the active import' : 'the demonstration graph'}</p>
           </div>
           <LinuxHostList
             hosts={hosts}
