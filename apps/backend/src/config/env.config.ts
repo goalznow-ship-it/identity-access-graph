@@ -12,4 +12,7 @@ export default () => ({
     encrypted: (process.env.NEO4J_ENCRYPTED ?? 'true').toLowerCase() !== 'false',
     queryTimeoutMs: Number(process.env.NEO4J_QUERY_TIMEOUT_MS || 30000),
   },
+  pipeline: {
+    allowDemoData: (process.env.PIPELINE_ALLOW_DEMO_DATA ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')).toLowerCase() === 'true',
+  },
 })

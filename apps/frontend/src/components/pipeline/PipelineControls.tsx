@@ -11,6 +11,7 @@ interface PipelineControlsProps {
   onPrevious: () => void
   onReplay: () => void
   onReset: () => void
+  inputReady?: boolean
 }
 
 export function PipelineControls({
@@ -23,6 +24,7 @@ export function PipelineControls({
   onPrevious,
   onReplay,
   onReset,
+  inputReady = true,
 }: PipelineControlsProps) {
   const status = state?.status ?? 'IDLE'
   const hasStages = (state?.completedStages.length ?? 0) > 0
@@ -33,7 +35,7 @@ export function PipelineControls({
       <Button
         variant="primary"
         loading={loading['start']}
-        disabled={status === 'RUNNING' || status === 'PAUSED'}
+        disabled={!inputReady || status === 'RUNNING' || status === 'PAUSED'}
         onClick={onStart}
       >
         Start
@@ -65,7 +67,7 @@ export function PipelineControls({
       <Button
         variant="ghost"
         loading={loading['next']}
-        disabled={status === 'RUNNING' || allComplete}
+        disabled={!inputReady || status === 'RUNNING' || allComplete}
         onClick={onNext}
       >
         Next

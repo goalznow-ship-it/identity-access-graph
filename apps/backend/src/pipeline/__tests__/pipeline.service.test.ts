@@ -45,6 +45,30 @@ describe('PipelineService', () => {
     await assert.rejects(() => new PipelineService(undefined, graph as any).start(), /50,000-record pipeline snapshot limit/)
   })
 
+  it('should fail closed without Neo4j when demonstration data is disabled', async () => {
+    const config = { get: (key: string) => key === 'pipeline.allowDemoData' ? false : undefined }
+    const service = new PipelineService(undefined, undefined, config as any)
+    assert.deepStrictEqual(service.getInputStatus(), {
+      ready: false,
+      source: 'unavailable',
+      productionSafe: false,
+      message: 'Neo4j must be enabled before pipeline runs can start.',
+    })
+    await assert.rejects(() => service.start(), /Neo4j is disabled/)
+    await assert.rejects(() => service.next(), /Neo4j is disabled/)
+  })
+
+  it('should discard reset input and reload the latest authoritative graph', async () => {
+    let revision = 0
+    const graph = { isPersistenceEnabled: () => true, exportNodes: async () => ({ items: [{ id: `node-${++revision}`, nodeType: 'USER', properties: {} }], truncated: false }), exportRelationships: async () => ({ items: [], truncated: false }) }
+    const service = new PipelineService(undefined, graph as any)
+    await service.next()
+    service.reset()
+    await service.next()
+    assert.strictEqual(revision, 2)
+    assert.strictEqual(service.getSnapshots()[0].output.nodes[0].id, 'node-2')
+  })
+
   it('should support next/previous step-by-step', async () => {
     const service = new PipelineService()
 

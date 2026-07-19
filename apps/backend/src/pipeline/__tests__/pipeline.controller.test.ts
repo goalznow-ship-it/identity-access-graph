@@ -21,6 +21,11 @@ describe('PipelineController', () => {
     assert.ok(snapshots.length > 0)
   })
 
+  it('should expose the active input source', () => {
+    const controller = new PipelineController(new PipelineService())
+    assert.strictEqual(controller.getInputStatus().source, 'demo')
+  })
+
   it('should start and complete pipeline on POST /pipeline/start', async () => {
     const service = new PipelineService()
     const controller = new PipelineController(service)

@@ -17,6 +17,7 @@ export class PipelineController {
     try {
       return await this.service.start()
     } catch (err) {
+      if (err instanceof HttpException) throw err
       throw new HttpException((err as Error).message, HttpStatus.CONFLICT)
     }
   }
@@ -63,6 +64,7 @@ export class PipelineController {
       }
       return result
     } catch (err) {
+      if (err instanceof HttpException) throw err
       throw new HttpException((err as Error).message, HttpStatus.CONFLICT)
     }
   }
@@ -113,5 +115,11 @@ export class PipelineController {
   @ApiResponse({ status: 200, description: 'Stage snapshots' })
   getSnapshots() {
     return this.service.getSnapshots()
+  }
+
+  @Get('input-status')
+  @ApiOperation({ summary: 'Get pipeline input readiness and source' })
+  getInputStatus() {
+    return this.service.getInputStatus()
   }
 }

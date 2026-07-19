@@ -11,6 +11,9 @@ interface Toast {
 interface UsePipelineReturn {
   state: PipelineRun | null
   snapshots: StageSnapshot[]
+  inputStatus: { ready: boolean; source: 'neo4j' | 'demo' | 'unavailable'; productionSafe: boolean; message: string } | null
+  initialLoading: boolean
+  loadError: string
   loading: Record<string, boolean>
   toasts: Toast[]
   removeToast: (id: number) => void
@@ -29,6 +32,9 @@ let toastId = 0
 export function usePipeline(): UsePipelineReturn {
   const [state, setState] = useState<PipelineRun | null>(null)
   const [snapshots, setSnapshots] = useState<StageSnapshot[]>([])
+  const [inputStatus, setInputStatus] = useState<UsePipelineReturn['inputStatus']>(null)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [toasts, setToasts] = useState<Toast[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -62,13 +68,19 @@ export function usePipeline(): UsePipelineReturn {
 
   const refresh = useCallback(async () => {
     try {
-      const [s, snap] = await Promise.all([
+      setLoadError('')
+      const [s, snap, input] = await Promise.all([
         pipelineApi.getState(),
         pipelineApi.getSnapshots(),
+        pipelineApi.getInputStatus(),
       ])
       setState(s)
       setSnapshots(snap)
-    } catch {
+      setInputStatus(input)
+    } catch (error) {
+      setLoadError((error as Error).message)
+    } finally {
+      setInitialLoading(false)
     }
   }, [])
 
@@ -140,6 +152,9 @@ export function usePipeline(): UsePipelineReturn {
   return {
     state,
     snapshots,
+    inputStatus,
+    initialLoading,
+    loadError,
     loading,
     toasts,
     removeToast,

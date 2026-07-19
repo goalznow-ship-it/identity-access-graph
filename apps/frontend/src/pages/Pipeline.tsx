@@ -14,6 +14,9 @@ export function PipelinePage() {
   const {
     state,
     snapshots,
+    inputStatus,
+    initialLoading,
+    loadError,
     loading,
     toasts,
     removeToast,
@@ -24,6 +27,7 @@ export function PipelinePage() {
     previous,
     replay,
     reset,
+    refresh,
   } = usePipeline()
 
   return (
@@ -38,6 +42,10 @@ export function PipelinePage() {
           Run and inspect identity extraction, normalization, matching, graph construction, and scheduling. Runs use an authoritative Neo4j snapshot when graph persistence is enabled.
         </p>
       </div>
+
+      {initialLoading && <div aria-label="Loading pipeline" className="h-24 animate-pulse rounded-xl bg-white/5" />}
+      {loadError && <div role="alert" className="rounded border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{loadError}<button onClick={() => void refresh()} className="ml-3 underline">Retry</button></div>}
+      {inputStatus && <div className={`rounded border p-3 text-sm ${inputStatus.productionSafe ? 'border-success/40 bg-success/10 text-success' : inputStatus.ready ? 'border-warning/40 bg-warning/10 text-warning' : 'border-danger/40 bg-danger/10 text-danger'}`}><b className="mr-2 uppercase">{inputStatus.source}</b>{inputStatus.message}</div>}
 
       <Section title="Pipeline Stages">
         <PipelineStepper state={state} />
@@ -54,6 +62,7 @@ export function PipelinePage() {
           onPrevious={previous}
           onReplay={replay}
           onReset={reset}
+          inputReady={inputStatus?.ready ?? false}
         />
       </Section>
 

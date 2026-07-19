@@ -17,7 +17,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new PipelineApiError(body || res.statusText, res.status)
+    let message = body
+    try { const parsed = JSON.parse(body); message = Array.isArray(parsed.message) ? parsed.message.join('; ') : parsed.message || body } catch { /* plain-text response */ }
+    throw new PipelineApiError(message || res.statusText, res.status)
   }
   return res.json()
 }
@@ -33,4 +35,5 @@ export const pipelineApi = {
   getState: () => request<import('../types/pipeline').PipelineRun>('/pipeline/state'),
   getSnapshots: () =>
     request<import('../types/pipeline').StageSnapshot[]>('/pipeline/snapshots'),
+  getInputStatus: () => request<{ ready: boolean; source: 'neo4j' | 'demo' | 'unavailable'; productionSafe: boolean; message: string }>('/pipeline/input-status'),
 }
