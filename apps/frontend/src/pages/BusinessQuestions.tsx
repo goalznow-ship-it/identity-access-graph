@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SearchBox } from '../components/ui/SearchBox'
 import { EmptyState } from '../components/ui/EmptyState'
 import { QuestionResultView } from '../components/business-questions'
 import { questionCatalog, getCategories } from '../services/businessQuestionCatalog'
-import { executeQuestion, getSuggestions } from '../services/businessQuestionEngine'
+import { executeQuestion, getSuggestions, setBusinessQuestionGraphData } from '../services/businessQuestionEngine'
+import { useGraphSource } from '../hooks/useGraphSource'
+import { useGraphData } from '../hooks/useGraphData'
 import type { BusinessQuestion, QuestionResult, QuestionCategory } from '../types/businessQuestions'
 import {
   HelpCircle, Server, Shield, Users, Key, AlertTriangle,
@@ -39,6 +41,9 @@ function CategoryBadge({ category }: { category: QuestionCategory }) {
 }
 
 export function BusinessQuestionsPage() {
+  const { source } = useGraphSource()
+  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
+  const graph = useGraphData(source === 'imported' ? importId : null, source)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<QuestionCategory | 'All'>('All')
   const [selectedQuestion, setSelectedQuestion] = useState<BusinessQuestion | null>(null)
@@ -48,6 +53,13 @@ export function BusinessQuestionsPage() {
   const [result, setResult] = useState<QuestionResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!graph.data) return
+    setBusinessQuestionGraphData(graph.data)
+    setResult(null)
+    setInputSuggestions([])
+  }, [graph.data])
 
   const categories = ['All' as const, ...getCategories()]
 
@@ -64,30 +76,30 @@ export function BusinessQuestionsPage() {
     setError(null)
     setInputValue('')
 
-    if (question.requiresInput) {
+    if (!graph.data) {
+      setError(graph.error || 'The selected graph dataset is not available.')
+    } else if (question.requiresInput) {
       const suggestions = getSuggestions(question.inputType || 'text')
       setInputSuggestions(suggestions)
     } else {
       executeQuestionAndShow(question.id)
     }
-  }, [])
+  }, [graph.data, graph.error])
 
   const executeQuestionAndShow = useCallback((questionId: string, input?: string) => {
     setLoading(true)
     setError(null)
     setResult(null)
 
-    setTimeout(() => {
-      try {
-        const res = executeQuestion(questionId, input)
-        setResult(res)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Query execution failed')
-      } finally {
-        setLoading(false)
-      }
-    }, 150)
-  }, [])
+    try {
+      if (!graph.data) throw new Error(graph.error || 'The selected graph dataset is not available.')
+      setResult(executeQuestion(questionId, input))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Query execution failed')
+    } finally {
+      setLoading(false)
+    }
+  }, [graph.data, graph.error])
 
   const handleExecute = useCallback(() => {
     if (!selectedQuestion) return
@@ -145,7 +157,7 @@ export function BusinessQuestionsPage() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-100">Business Questions Engine</h1>
-          <p className="text-sm text-gray-500">Answer enterprise IAM questions through reusable graph queries.</p>
+          <p className="text-sm text-gray-500">Answer enterprise IAM questions against {source === 'neo4j' ? 'Neo4j Live' : source === 'imported' ? 'the active import' : 'the explicitly selected demonstration graph'}.</p>
         </div>
         {result && (
           <div className="flex gap-2">
@@ -154,6 +166,9 @@ export function BusinessQuestionsPage() {
           </div>
         )}
       </div>
+
+      {graph.loading && <div className="mb-3 h-10 animate-pulse rounded bg-white/5" aria-label="Loading analytics graph" />}
+      {graph.error && <div role="alert" className="mb-3 rounded border border-danger/40 p-3 text-xs text-danger">{graph.error}<button onClick={() => void graph.retry()} className="ml-3 underline">Retry</button></div>}
 
       <div className="flex gap-4 min-h-0 flex-1">
         <div className="flex w-80 shrink-0 flex-col">

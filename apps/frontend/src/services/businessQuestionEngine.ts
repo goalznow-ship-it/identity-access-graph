@@ -1,13 +1,9 @@
 import type { GraphNode, GraphLink, GraphData } from '../types/graph'
 import type { QuestionResult } from '../types/businessQuestions'
-import mockData from './mockGraphData.json'
 
-let graphData: GraphData | null = null
+let graphData: GraphData = { nodes: [], links: [] }
 
 function getData(): GraphData {
-  if (!graphData) {
-    graphData = mockData as unknown as GraphData
-  }
   return graphData
 }
 
@@ -965,6 +961,11 @@ const resultCache = new Map<string, QuestionResult>()
 
 export function clearCache(): void {
   resultCache.clear()
+}
+
+export function setBusinessQuestionGraphData(data: GraphData): void {
+  graphData = data
+  clearCache()
 }
 
 export function executeQuestion(questionId: string, input?: string): QuestionResult {
