@@ -28,3 +28,5 @@ Durable risk scan history and finding lifecycle reconciliation are documented in
 Enterprise attack-path discovery, blast radius, choke points, history, exports, and APIs are documented in [docs/ENTERPRISE_ATTACK_PATH_ENGINE.md](docs/ENTERPRISE_ATTACK_PATH_ENGINE.md).
 
 Durable operational alerts and the notification center are documented in [docs/ENTERPRISE_NOTIFICATIONS.md](docs/ENTERPRISE_NOTIFICATIONS.md).
+
+Shared workspace configuration and settings audit history are documented in [docs/ENTERPRISE_ADMINISTRATION.md](docs/ENTERPRISE_ADMINISTRATION.md).

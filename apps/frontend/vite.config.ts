@@ -28,6 +28,7 @@ export default defineConfig({
       '/identity':     backend,
       '/pipeline':     backend,
       '/notifications': backend,
+      '/admin':         backend,
       '/health':       backend,
     },
   },

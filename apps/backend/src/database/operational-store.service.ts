@@ -42,6 +42,7 @@ export class OperationalStoreService {
   savePipeline(row: Partial<PipelineRunEntity> & Pick<PipelineRunEntity, 'id'>) { this.track(this.pipelines.save(row)); }
   getMetadata(key: string) { return this.metadata.findOneBy({ key }) }
   setMetadata(key: string, value: Record<string, unknown>) { this.track(this.metadata.save({ key, value })); }
+  async setMetadataAsync(key: string, value: Record<string, unknown>) { await this.metadata.save({ key, value }); }
   async flush() {
     await Promise.all([...this.pending])
     const error = this.writeErrors.shift()

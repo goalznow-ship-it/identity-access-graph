@@ -11,6 +11,7 @@ import { ConnectorsModule } from '../connectors'
 import { IdentityModule } from '../identity'
 import { DatabaseModule } from '../database/database.module'
 import { NotificationsModule } from '../notifications'
+import { SettingsModule } from '../settings'
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { NotificationsModule } from '../notifications'
     }),
     DatabaseModule,
     NotificationsModule,
+    SettingsModule,
     Neo4jModule,
     HealthModule,
     PipelineModule,

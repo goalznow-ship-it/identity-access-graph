@@ -1,0 +1,2 @@
+import{Body,Controller,Get,Put,Post,Query}from'@nestjs/common';import{SettingsService}from'./settings.service';import type{WorkspaceSettings}from'./settings.types'
+@Controller('admin/settings')export class SettingsController{constructor(private settings:SettingsService){}@Get()get(){return this.settings.get()}@Put()update(@Body()body:Partial<WorkspaceSettings>){return this.settings.update(body)}@Post('reset')reset(){return this.settings.reset()}@Get('history')history(@Query('limit')limit?:string){return this.settings.history(limit?Number(limit):50)}}

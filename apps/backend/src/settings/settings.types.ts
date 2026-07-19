@@ -1,0 +1,2 @@
+export interface WorkspaceSettings{graphSource:'mock'|'imported'|'neo4j';layout:'force'|'hierarchy'|'radial'|'concentric';showLabels:boolean;animations:boolean;compact:boolean;pageSize:number;neo4jNodeLimit:number;neo4jRelationshipLimit:number;autoFallback:boolean;apiTimeoutMs:number}
+export interface SettingsAuditEvent{id:string;actor:string;action:'UPDATE'|'RESET';changes:Record<string,{from:unknown;to:unknown}>;createdAt:string}
