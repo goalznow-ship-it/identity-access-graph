@@ -24,3 +24,5 @@ The production import queue and reporting APIs are documented in [docs/ENTERPRIS
 Neo4j graph versioning, snapshots, traversal, indexes, and operational commands are documented in [docs/ENTERPRISE_GRAPH_ENGINE.md](docs/ENTERPRISE_GRAPH_ENGINE.md).
 
 Durable risk scan history and finding lifecycle reconciliation are documented in [docs/ENTERPRISE_RISK_ENGINE.md](docs/ENTERPRISE_RISK_ENGINE.md).
+
+Enterprise attack-path discovery, blast radius, choke points, history, exports, and APIs are documented in [docs/ENTERPRISE_ATTACK_PATH_ENGINE.md](docs/ENTERPRISE_ATTACK_PATH_ENGINE.md).

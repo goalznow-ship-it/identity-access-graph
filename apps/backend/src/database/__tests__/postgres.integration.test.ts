@@ -7,6 +7,7 @@ import { ConnectorRepository } from '../../connectors/connector.repository'
 import { ConnectorStatus, ConnectorType, SyncMode, type Connector } from '../../connectors/connector.types'
 import {
   AttackPathEntity,
+  AttackPathRunEntity,
   DATABASE_ENTITIES,
   ConnectorEntity,
   ConnectorSyncRunEntity,
@@ -26,6 +27,7 @@ import { InitialOperationalPersistence1721380800000 } from '../migrations/172138
 import { EnterpriseImportEngine1721467200000 } from '../migrations/1721467200000-EnterpriseImportEngine'
 import { EnterpriseGraphEngine1721553600000 } from '../migrations/1721553600000-EnterpriseGraphEngine'
 import { EnterpriseRiskEngine1721640000000 } from '../migrations/1721640000000-EnterpriseRiskEngine'
+import { EnterpriseAttackPathEngine1721726400000 } from '../migrations/1721726400000-EnterpriseAttackPathEngine'
 import { OperationalStoreService } from '../operational-store.service'
 import { ImportQueueService } from '../../imports/import-queue.service'
 import { ImportReportingService } from '../../imports/import-reporting.service'
@@ -57,7 +59,7 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
       type: 'postgres',
       url: databaseUrl,
       entities: DATABASE_ENTITIES,
-      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000],
+      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000, EnterpriseAttackPathEngine1721726400000],
       synchronize: false,
     })
     await dataSource.initialize()
@@ -72,6 +74,7 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
       dataSource.getRepository(EnterpriseIdentityEntity),
       dataSource.getRepository(PipelineRunEntity),
       dataSource.getRepository(OperationalMetadataEntity),
+      dataSource.getRepository(AttackPathRunEntity),
     )
   })
 
@@ -81,12 +84,12 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
 
   it('runs the versioned migration once and supports rollback and re-apply', async () => {
     const firstRun = await dataSource.runMigrations({ transaction: 'all' })
-    assert.equal(firstRun.length, 4)
+    assert.equal(firstRun.length, 5)
     assert.equal(await dataSource.getRepository(ConnectorEntity).count(), 0)
     assert.equal((await dataSource.runMigrations({ transaction: 'all' })).length, 0)
 
     await dataSource.undoLastMigration({ transaction: 'all' })
-    const tableAfterRollback = await dataSource.query(`SELECT to_regclass('public.risk_scan_runs') AS name`)
+    const tableAfterRollback = await dataSource.query(`SELECT to_regclass('public.attack_path_runs') AS name`)
     assert.equal(tableAfterRollback[0].name, null)
     assert.equal((await dataSource.runMigrations({ transaction: 'all' })).length, 1)
   })

@@ -12,6 +12,7 @@
     "start:prod": "node dist/main",
     "test:integration": "NODE_ENV=test tsx --test src/database/__tests__/*.integration.test.ts",
     "test:graph-integration": "NODE_ENV=test tsx --test src/graph/__tests__/*.integration.test.ts",
+    "smoke:attack-path": "NODE_ENV=test tsx --test src/attack-path/__tests__/attack-path.runtime-smoke.test.ts",
     "migration:run": "node node_modules/typeorm/cli-ts-node-commonjs.js -d src/database/data-source.ts migration:run",
     "migration:revert": "node node_modules/typeorm/cli-ts-node-commonjs.js -d src/database/data-source.ts migration:revert"
   },
