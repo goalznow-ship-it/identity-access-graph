@@ -9,9 +9,10 @@
     "test": "NODE_ENV=test tsx --test src/pipeline/__tests__/*.test.ts src/imports/__tests__/*.test.ts src/neo4j/__tests__/*.test.ts src/risk/__tests__/*.test.ts src/attack-path/__tests__/*.test.ts src/connectors/__tests__/*.test.ts src/identity/__tests__/*.test.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
-    ,"migration:run": "node node_modules/typeorm/cli-ts-node-commonjs.js -d src/database/data-source.ts migration:run"
-    ,"migration:revert": "node node_modules/typeorm/cli-ts-node-commonjs.js -d src/database/data-source.ts migration:revert"
+    "start:prod": "node dist/main",
+    "test:integration": "NODE_ENV=test tsx --test src/database/__tests__/*.integration.test.ts",
+    "migration:run": "node node_modules/typeorm/cli-ts-node-commonjs.js -d src/database/data-source.ts migration:run",
+    "migration:revert": "node node_modules/typeorm/cli-ts-node-commonjs.js -d src/database/data-source.ts migration:revert"
   },
   "dependencies": {
     "@azure/identity": "^4.13.1",
