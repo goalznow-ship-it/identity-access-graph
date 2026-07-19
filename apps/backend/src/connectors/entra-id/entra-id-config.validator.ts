@@ -8,9 +8,6 @@ export function validateEntraIdConfiguration(configuration: ConnectorConfigurati
   if (authMode === AuthenticationMode.CLIENT_SECRET && !configuration.entraClientSecret?.trim()) {
     throw new BadRequestException('Client secret is required when using CLIENT_SECRET authentication')
   }
-  if (authMode === AuthenticationMode.DEVICE_CODE && !configuration.entraUseDeviceCode) {
-    throw new BadRequestException('Device code flow must be enabled when using DEVICE_CODE authentication')
-  }
   if (authMode === AuthenticationMode.CERTIFICATE) {
     if (!configuration.entraCertificateThumbprint?.trim()) throw new BadRequestException('Certificate thumbprint is required for certificate authentication')
     if (!configuration.entraCertificatePrivateKey?.trim()) throw new BadRequestException('Certificate private key is required for certificate authentication')
@@ -19,6 +16,7 @@ export function validateEntraIdConfiguration(configuration: ConnectorConfigurati
     ...configuration,
     entraTenantId: configuration.entraTenantId.trim(),
     entraClientId: configuration.entraClientId.trim(),
+    entraUseDeviceCode: authMode === AuthenticationMode.DEVICE_CODE,
     entraRedirectUri: configuration.entraRedirectUri ?? 'http://localhost:3000/auth/callback',
   }
 }
