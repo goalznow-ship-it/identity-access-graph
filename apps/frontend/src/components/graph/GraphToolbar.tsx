@@ -1,5 +1,6 @@
 import type { GraphLayout, HighlightMode } from '../../types/graph'
 import type { GraphSourceMode } from '../../types/neo4j'
+import { DEMO_DATA_ENABLED } from '../../services/runtimeConfig'
 
 interface GraphToolbarProps {
   onZoomIn: () => void
@@ -91,7 +92,7 @@ export function GraphToolbar({
 
       <button className="sr-only" onClick={onZoomIn}>Zoom in</button>
       <button className="sr-only" onClick={onZoomOut}>Zoom out</button>
-      <select className="sr-only" value={source} onChange={(event) => onSourceChange(event.target.value as GraphSourceMode)}><option value="mock">Mock</option><option value="imported" disabled={!importedAvailable}>Import</option><option value="neo4j">Neo4j</option></select>
+      <select className="sr-only" value={source} onChange={(event) => onSourceChange(event.target.value as GraphSourceMode)}>{DEMO_DATA_ENABLED&&<option value="mock">Mock</option>}<option value="imported" disabled={!importedAvailable}>Import</option><option value="neo4j">Neo4j</option></select>
 
       {hasSelection && (
         <>

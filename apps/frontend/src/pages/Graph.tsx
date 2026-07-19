@@ -351,7 +351,7 @@ export function GraphPage() {
                   <p className="mt-1 text-xs leading-relaxed text-gray-400">This dataset has {investigation.focusedData.nodes.length} nodes but no relationships. Path analysis requires relationship data.</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button onClick={() => navigate('/imports')} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-hover">Import relationship data</button>
-                    <button onClick={() => setSource('mock')} className="rounded-lg border border-border px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5">Try demo graph</button>
+                    {DEMO_DATA_ENABLED&&<button onClick={() => setSource('mock')} className="rounded-lg border border-border px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5">Try demo graph</button>}
                   </div>
                 </div>
               </div>
