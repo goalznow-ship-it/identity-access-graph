@@ -13,6 +13,8 @@ import {
   EnterpriseIdentityEntity,
   GraphSnapshotEntity,
   ImportSessionEntity,
+  ImportAuditLogEntity,
+  ImportJobEntity,
   OperationalMetadataEntity,
   PipelineRunEntity,
   RiskFindingEntity,
@@ -20,6 +22,7 @@ import {
 import { InitialOperationalPersistence1721380800000 } from '../migrations/1721380800000-InitialOperationalPersistence'
 import { EnterpriseImportEngine1721467200000 } from '../migrations/1721467200000-EnterpriseImportEngine'
 import { OperationalStoreService } from '../operational-store.service'
+import { ImportQueueService } from '../../imports/import-queue.service'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
 
@@ -135,5 +138,20 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
     assert.deepEqual(row.payload, { nodes: [{ id: 'node-1' }], relationships: [] })
     await dataSource.getRepository(GraphSnapshotEntity).delete(id)
     assert.equal(await dataSource.getRepository(GraphSnapshotEntity).findOneBy({ id }), null)
+  })
+
+  it('claims durable import jobs once and records their audit lifecycle', async () => {
+    const importId = randomUUID(), fileId = randomUUID(), now = Date.now()
+    await dataSource.getRepository(ImportSessionEntity).save({ importId, status: 'parsing', cancelled: false, payload: {}, createdAt: new Date(now), expiresAt: new Date(now + 60_000) })
+    const queue = new ImportQueueService(dataSource, dataSource.getRepository(ImportJobEntity), dataSource.getRepository(ImportAuditLogEntity))
+    const queued = await queue.enqueue(importId, fileId)
+    const [first, second] = await Promise.all([queue.claim('worker-a'), queue.claim('worker-b')])
+    assert.equal([first, second].filter(Boolean).length, 1)
+    assert.equal((first ?? second)?.id, queued.id)
+    await queue.checkpoint(queued.id, { row: 5000 })
+    await queue.complete((first ?? second)!)
+    assert.equal((await queue.jobsFor(importId))[0].status, 'COMPLETED')
+    assert.deepEqual((await queue.jobsFor(importId))[0].checkpoint, { row: 5000 })
+    assert.deepEqual((await queue.auditFor(importId)).map((entry) => entry.event), ['JOB_QUEUED', 'JOB_COMPLETED'])
   })
 })

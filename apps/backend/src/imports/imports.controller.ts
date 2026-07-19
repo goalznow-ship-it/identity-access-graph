@@ -50,6 +50,16 @@ export class ImportsController {
     }
   }
 
+  @Post('upload-async')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Upload files and enqueue durable background processing' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('files', 50))
+  async uploadAsync(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files?.length) throw new HttpException('No files provided.', HttpStatus.BAD_REQUEST)
+    return this.service.uploadAsync(files)
+  }
+
   @Get('active')
   @ApiOperation({ summary: 'Get the most recent import session' })
   getActiveSession() {

@@ -8,11 +8,14 @@ import { GraphConversionService } from './graph-conversion'
 import { GraphModule } from '../graph'
 import { ImportGraphPersistenceService } from './import-graph-persistence.service'
 import { RiskModule } from '../risk'
+import { ImportQueueService } from './import-queue.service'
+import { ImportWorkerService } from './import-worker.service'
+import { ImportWorkerController } from './import-worker.controller'
 
 @Module({
   imports: [GraphModule, RiskModule],
-  controllers: [ImportsController],
-  providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],
+  controllers: [ImportsController, ImportWorkerController],
+  providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService, ImportQueueService, ImportWorkerService],
   exports: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],
 })
 export class ImportsModule {}

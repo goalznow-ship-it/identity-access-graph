@@ -13,6 +13,8 @@ import type { ColumnMapping } from './mapping/mapping.service'
 import type { CorrelationResult } from './correlation'
 import type { ConversionResult } from './graph-conversion'
 import { OperationalStoreService } from '../database/operational-store.service'
+import type { ImportJobEntity } from '../database/entities'
+import { ImportQueueService } from './import-queue.service'
 
 const UPLOAD_DIR = IMPORT_CONFIG.uploadDir
 const STATE_DIR = path.join(UPLOAD_DIR, '.state')
@@ -42,7 +44,7 @@ export class ImportsService implements OnModuleInit {
     return `${importId}:${fileId}:${sheetIndex}`
   }
 
-  constructor(@Optional() private readonly store?: OperationalStoreService) {
+  constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly queue?: ImportQueueService) {
     if (!fs.existsSync(UPLOAD_DIR)) {
       fs.mkdirSync(UPLOAD_DIR, { recursive: true })
     }
@@ -186,6 +188,25 @@ export class ImportsService implements OnModuleInit {
     return session
   }
 
+  async uploadAsync(files: Express.Multer.File[]): Promise<ImportSession> {
+    if (!this.queue) return this.upload(files)
+    if (this.sessions.size >= IMPORT_CONFIG.maxConcurrentSessions) throw new Error(`Maximum concurrent sessions (${IMPORT_CONFIG.maxConcurrentSessions}) reached.`)
+    const importId = randomUUID(), createdAt = Date.now(), importFiles: ImportFile[] = []
+    for (const file of files.slice(0, IMPORT_CONFIG.maxFilesPerSession)) {
+      const id = randomUUID(), sanitizedName = sanitizeName(file.originalname), filePath = path.join(UPLOAD_DIR, `${id}-${sanitizedName}`)
+      if (!isAllowed(file.originalname) || file.size > IMPORT_CONFIG.maxFileSizeBytes) {
+        importFiles.push(this.errorFile(file, !isAllowed(file.originalname) ? 'Unsupported file type.' : 'File exceeds configured size limit.', id)); continue
+      }
+      fs.writeFileSync(filePath, file.buffer)
+      importFiles.push({ id, originalName: file.originalname, sanitizedName, mimeType: file.mimetype, size: file.size, status: 'uploaded', sheets: [], filePath, progress: { phase: 'uploading', percent: 100, rowsProcessed: 0, totalRows: 0, throughput: 0, elapsedMs: 0, estimatedRemainingMs: 0 } })
+    }
+    const session: ImportSession = { importId, files: importFiles, createdAt, progress: { status: 'parsing', filesCompleted: 0, filesFailed: importFiles.filter((file) => file.status === 'error').length, totalRows: 0, rowsProcessed: 0, percent: 0, throughput: 0, elapsedMs: 0, estimatedRemainingMs: 0, warnings: [], truncated: false } }
+    this.sessions.set(importId, session); this.persistSnapshot(importId); await this.store?.flush(); this.scheduleCleanup(importId)
+    await this.queue.record(importId, 'IMPORT_CREATED', { fileCount: importFiles.length, asynchronous: true })
+    await Promise.all(importFiles.filter((file) => file.status === 'uploaded').map((file) => this.queue!.enqueue(importId, file.id)))
+    return session
+  }
+
   getSession(importId: string): ImportSession | undefined {
     return this.sessions.get(importId)
   }
@@ -210,12 +231,13 @@ export class ImportsService implements OnModuleInit {
     if (!session) return false
     session.cancelled = true
     this.cancelledSessions.add(importId)
+    void this.queue?.cancel(importId)
     this.updateProgress(importId, { status: 'cancelled' })
     this.cleanupSessionFiles(importId)
     return true
   }
 
-  async retryFile(importId: string, fileId: string): Promise<ImportSession | null> {
+  async retryFile(importId: string, fileId: string, inline = false): Promise<ImportSession | null> {
     const session = this.sessions.get(importId)
     if (!session) return null
 
@@ -224,6 +246,12 @@ export class ImportsService implements OnModuleInit {
 
     const file = session.files[fileIndex]
     if (!file.filePath || !fs.existsSync(file.filePath)) return null
+
+    if (this.queue && !inline) {
+      file.status = 'uploaded'; file.error = undefined; this.persistSnapshot(importId)
+      await this.queue.retry(importId, fileId)
+      return session
+    }
 
     try {
       const ext = path.extname(file.originalName).toLowerCase()
@@ -268,6 +296,25 @@ export class ImportsService implements OnModuleInit {
       this.persistSnapshot(importId)
       return null
     }
+  }
+
+  async processQueuedJob(job: ImportJobEntity, saveCheckpoint: (checkpoint: Record<string, unknown>) => Promise<void>): Promise<void> {
+    const session = this.sessions.get(job.importId)
+    const file = session?.files.find((item) => item.id === job.fileId)
+    if (!session || !file) throw new Error('Import session or file is no longer available.')
+    if (session.cancelled || this.cancelledSessions.has(job.importId)) throw new Error('Import was cancelled.')
+    await saveCheckpoint({ phase: 'parsing', fileId: file.id, rowsProcessed: file.progress?.rowsProcessed ?? 0 })
+    if (file.status === 'uploaded' || file.status === 'error') {
+      file.status = 'error'
+      const retried = await this.retryFile(job.importId, job.fileId, true)
+      if (!retried || retried.files.find((item) => item.id === job.fileId)?.status === 'error') throw new Error(file.error ?? 'File processing failed.')
+    }
+    const rows = file.sheets.reduce((sum, sheet) => sum + sheet.rowCount, 0)
+    const terminal = session.files.every((item) => item.status === 'inspected' || item.status === 'error')
+    const processed = session.files.reduce((sum, item) => sum + item.sheets.reduce((sheetSum, sheet) => sheetSum + sheet.rowCount, 0), 0)
+    session.progress = { ...session.progress!, status: terminal ? 'completed' : 'parsing', filesCompleted: session.files.filter((item) => item.status === 'inspected').length, filesFailed: session.files.filter((item) => item.status === 'error').length, totalRows: processed, rowsProcessed: processed, percent: terminal ? 100 : Math.round(session.files.filter((item) => item.status !== 'uploaded').length / session.files.length * 100), elapsedMs: Date.now() - session.createdAt }
+    this.persistSnapshot(job.importId); await this.store?.flush()
+    await saveCheckpoint({ phase: 'completed', fileId: file.id, rowsProcessed: rows })
   }
 
   removeFile(importId: string, fileId: string): ImportSession | null {
