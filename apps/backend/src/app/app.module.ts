@@ -10,6 +10,7 @@ import { AttackPathModule } from '../attack-path'
 import { ConnectorsModule } from '../connectors'
 import { IdentityModule } from '../identity'
 import { DatabaseModule } from '../database/database.module'
+import { NotificationsModule } from '../notifications'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { DatabaseModule } from '../database/database.module'
       load: [envConfig],
     }),
     DatabaseModule,
+    NotificationsModule,
     Neo4jModule,
     HealthModule,
     PipelineModule,

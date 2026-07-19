@@ -27,6 +27,7 @@ export default defineConfig({
       '/connectors':   passThrough('/connectors'),
       '/identity':     backend,
       '/pipeline':     backend,
+      '/notifications': backend,
       '/health':       backend,
     },
   },
