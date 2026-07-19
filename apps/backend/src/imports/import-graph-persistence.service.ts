@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common'
-import { GraphService } from '../graph'
+import { EnterpriseGraphService, GraphService } from '../graph'
 import type { PersistedGraphNode, PersistedGraphRelationship } from '../graph'
 import { ImportsService } from './imports.service'
 import { RiskGraphSourceService } from '../risk'
@@ -25,6 +25,7 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     private readonly imports: ImportsService,
     private readonly graph: GraphService,
     @Optional() private readonly riskSource?: RiskGraphSourceService,
+    @Optional() private readonly enterpriseGraph?: EnterpriseGraphService,
   ) {}
 
   persistConvertedGraph(importId: string) { return this.persist(importId) }
@@ -52,6 +53,10 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
 
     const nodes = completeGraph.nodes as PersistedGraphNode[]
     const relationships = completeGraph.links as PersistedGraphRelationship[]
+    if (this.enterpriseGraph) {
+      const version = await this.enterpriseGraph.apply({ source: `import:${importId}`, description: `Imported graph ${importId}`, metadata: { importId }, nodes, relationships })
+      return { nodesUpserted: version.counts.nodesAdded + version.counts.nodesUpdated, relationshipsUpserted: version.counts.relationshipsAdded + version.counts.relationshipsUpdated, skipped: conversion.duplicateNodesSkipped, conflicts: conversion.conflicts.length, durationMs: Date.now() - started, storageMode: 'neo4j' }
+    }
     const nodeSummary = await this.graph.upsertNodes(nodes)
     const relationshipSummary = await this.graph.upsertRelationships(relationships)
     return {
