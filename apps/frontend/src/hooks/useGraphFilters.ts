@@ -21,6 +21,14 @@ interface UseGraphFiltersReturn {
   allAccessTypes: string[]
 }
 
+export function graphEndpointId(endpoint: GraphData['links'][number]['source']): string {
+  return typeof endpoint === 'string' ? endpoint : endpoint.id
+}
+
+function connectsOnly(link: GraphData['links'][number], nodeIds: Set<string>): boolean {
+  return nodeIds.has(graphEndpointId(link.source)) && nodeIds.has(graphEndpointId(link.target))
+}
+
 export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
   const [filters, setFilters] = useState<GraphFiltersState>({
     systems: [],
@@ -68,34 +76,34 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
       const sys = new Set(filters.systems)
       const nodeIds = new Set(nodes.filter((n) => sys.has(n.sourceSystem)).map((n) => n.id))
       nodes = nodes.filter((n) => nodeIds.has(n.id))
-      links = links.filter((l) => nodeIds.has(l.source as string) && nodeIds.has(l.target as string))
+      links = links.filter((link) => connectsOnly(link, nodeIds))
     }
 
     if (filters.nodeTypes.length > 0) {
       const types = new Set(filters.nodeTypes)
       const nodeIds = new Set(nodes.filter((n) => types.has(n.nodeType)).map((n) => n.id))
       nodes = nodes.filter((n) => nodeIds.has(n.id))
-      links = links.filter((l) => nodeIds.has(l.source as string) && nodeIds.has(l.target as string))
+      links = links.filter((link) => connectsOnly(link, nodeIds))
     }
 
     if (filters.riskLevels.length > 0) {
       const rl = new Set(filters.riskLevels)
       const nodeIds = new Set(nodes.filter((n) => rl.has(n.riskLevel)).map((n) => n.id))
       nodes = nodes.filter((n) => nodeIds.has(n.id))
-      links = links.filter((l) => nodeIds.has(l.source as string) && nodeIds.has(l.target as string))
+      links = links.filter((link) => connectsOnly(link, nodeIds))
     }
 
     if (filters.statuses.length > 0) {
       const statuses = new Set(filters.statuses)
       const nodeIds = new Set(nodes.filter((node) => statuses.has(String(node.properties.status ?? 'UNKNOWN'))).map((node) => node.id))
       nodes = nodes.filter((node) => nodeIds.has(node.id))
-      links = links.filter((link) => nodeIds.has(typeof link.source === 'object' ? (link.source as any).id : link.source) && nodeIds.has(typeof link.target === 'object' ? (link.target as any).id : link.target))
+      links = links.filter((link) => connectsOnly(link, nodeIds))
     }
 
     if (filters.accessTypes.length > 0) {
       const access = new Set(filters.accessTypes)
       links = links.filter((link) => access.has(link.relationshipType))
-      const nodeIds = new Set(links.flatMap((link) => [typeof link.source === 'object' ? (link.source as any).id : link.source, typeof link.target === 'object' ? (link.target as any).id : link.target]))
+      const nodeIds = new Set(links.flatMap((link) => [graphEndpointId(link.source), graphEndpointId(link.target)]))
       nodes = nodes.filter((node) => nodeIds.has(node.id))
     }
 
@@ -115,7 +123,7 @@ export function useGraphFilters(data: GraphData | null): UseGraphFiltersReturn {
         ).map((n) => n.id),
       )
       nodes = nodes.filter((n) => nodeIds.has(n.id))
-      links = links.filter((l) => nodeIds.has(l.source as string) && nodeIds.has(l.target as string))
+      links = links.filter((link) => connectsOnly(link, nodeIds))
     }
 
     return { nodes, links }
