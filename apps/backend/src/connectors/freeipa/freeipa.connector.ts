@@ -8,7 +8,7 @@ import { normalizeFreeipaEntry } from './freeipa.mapper'
 export class FreeipaConnector {
   constructor(@Inject(LDAP_CLIENT_FACTORY) private factory: LdapClientFactory) {}
 
-  async extract(connector: Connector, limit: number, watermark?: string, signal?: AbortSignal) {
+  async extract(connector: Connector, limit?: number, watermark?: string, signal?: AbortSignal) {
     const config = {
       url: connector.configuration.freeipaUrl ?? '',
       baseDn: connector.configuration.freeipaBaseDn ?? '',
@@ -29,25 +29,25 @@ export class FreeipaConnector {
       await client.bind(config.bindDn, config.bindPassword)
 
       for (const [type, baseFilter] of Object.entries(FREEIPA_FILTERS)) {
-        if (entries.length >= limit) break
+        if (limit !== undefined && entries.length >= limit) break
         const filter = watermark ? andFilter(baseFilter, changedSinceFilter(watermark)) : baseFilter
         const pages = await client.pagedSearch({
           baseDn: connector.configuration.freeipaBaseDn ?? '',
           filter,
           attributes: [...ALL_FREEIPA_ATTRIBUTES, 'objectClass'],
           pageSize: config.pageSize,
-          sizeLimit: limit - entries.length,
+          sizeLimit: limit === undefined ? undefined : limit - entries.length,
           signal,
           operationTimeoutMs: config.operationTimeoutMs,
         })
         pageCounts[type] = pages.length
-        entries.push(...pages.flatMap(page => page.entries).slice(0, limit - entries.length))
+        entries.push(...(limit === undefined ? pages.flatMap(page => page.entries) : pages.flatMap(page => page.entries).slice(0, limit - entries.length)))
       }
 
       const namingContexts = await client.discoverNamingContexts()
       const objects = entries.map(normalizeFreeipaEntry)
 
-      return { objects: objects.slice(0, limit), pageCounts, namingContexts }
+      return { objects: limit === undefined ? objects : objects.slice(0, limit), pageCounts, namingContexts }
     } finally {
       await client.unbind()
     }

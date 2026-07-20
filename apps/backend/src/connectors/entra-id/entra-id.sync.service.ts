@@ -42,7 +42,7 @@ export class EntraIdSyncService {
     this.repository.save(connector)
 
     try {
-      const limit = mode === SyncMode.PREVIEW ? Math.min(500, Math.max(1, options.previewLimit ?? 100)) : 100000
+      const limit = mode === SyncMode.PREVIEW ? Math.min(500, Math.max(1, options.previewLimit ?? 100)) : undefined
       const watermark = mode === SyncMode.INCREMENTAL ? connector.lastSuccessfulSyncAt : undefined
       const result = await this.extraction.extract(connector, limit, watermark)
 
@@ -78,8 +78,7 @@ export class EntraIdSyncService {
       let persisted = false
       let riskScanned = false
       if (options.persist) {
-        await this.graph.upsertNodes(mapped.nodes)
-        await this.graph.upsertRelationships(mapped.relationships)
+        await this.graph.applyVersioned(`connector:${connector.id}`, mapped.nodes, mapped.relationships, { connectorId: connector.id, syncRunId: run.syncRunId, mode })
         persisted = true
       }
       if (options.runRiskScan) {
@@ -87,7 +86,7 @@ export class EntraIdSyncService {
         riskScanned = true
       }
 
-      const preview = result.objects.slice(0, Math.min(limit, 100)).map(obj => ({
+      const preview = result.objects.slice(0, Math.min(limit ?? 100, 100)).map(obj => ({
         objectType: obj.objectType,
         id: obj.id,
         displayName: obj.attributes.displayName,
@@ -129,6 +128,7 @@ export class EntraIdSyncService {
       connector.updatedAt = new Date().toISOString()
       this.repository.save(connector)
       this.active.delete(connector.id)
+      await this.repository.flush()
     }
   }
 }

@@ -10,6 +10,7 @@ export class ConnectorRepository implements OnModuleInit {
   private connectors = new Map<string, Connector>()
   private runs = new Map<string, SyncRun[]>()
   private pending = new Set<Promise<unknown>>()
+  private writeErrors: Error[] = []
 
   constructor(
     @Optional() @InjectRepository(ConnectorEntity) private readonly connectorStore?: Repository<ConnectorEntity>,
@@ -52,10 +53,10 @@ export class ConnectorRepository implements OnModuleInit {
   }
   runsFor(id: string) { return this.runs.get(id) ?? [] }
   run(id: string, runId: string) { return this.runsFor(id).find((run) => run.syncRunId === runId) }
-  async flush() { await Promise.all([...this.pending]) }
+  async flush() { await Promise.all([...this.pending]); const error = this.writeErrors.shift(); if (error) throw error }
 
   private track<T>(operation: Promise<T>) {
     this.pending.add(operation)
-    operation.catch((error) => this.logger.error(`PostgreSQL connector write failed: ${(error as Error).message}`)).finally(() => this.pending.delete(operation))
+    operation.catch((error: Error) => { this.writeErrors.push(error); this.logger.error(`PostgreSQL connector write failed: ${error.message}`) }).finally(() => this.pending.delete(operation))
   }
 }

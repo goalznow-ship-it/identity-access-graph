@@ -15,7 +15,7 @@ export interface LinuxExtractResult {
 }
 
 export class LinuxSshConnector {
-  async extract(connector: Connector, limit: number): Promise<LinuxExtractResult> {
+  async extract(connector: Connector, limit?: number): Promise<LinuxExtractResult> {
     const runner = new LibSshRunner()
     const warnings: string[] = []
 
@@ -50,9 +50,9 @@ export class LinuxSshConnector {
       const groupContent = cmdResults.group?.stdout ?? ''
       const sudoersContent = cmdResults.sudoers?.stdout ?? ''
 
-      const passwd = parsePasswd(passwdContent).slice(0, limit)
-      const groups = parseGroup(groupContent).slice(0, limit)
-      const sudoRules = parseSudoers(sudoersContent).slice(0, Math.min(limit, 50))
+      const passwd = limit === undefined ? parsePasswd(passwdContent) : parsePasswd(passwdContent).slice(0, limit)
+      const groups = limit === undefined ? parseGroup(groupContent) : parseGroup(groupContent).slice(0, limit)
+      const sudoRules = limit === undefined ? parseSudoers(sudoersContent) : parseSudoers(sudoersContent).slice(0, limit)
 
       const textResults: Record<string, string> = {}
       for (const [key, result] of Object.entries(cmdResults)) {

@@ -42,7 +42,7 @@ export class LinuxSshSyncService {
     this.repository.save(connector)
 
     try {
-      const limit = mode === SyncMode.PREVIEW ? Math.min(500, Math.max(1, options.previewLimit ?? 100)) : 100000
+      const limit = mode === SyncMode.PREVIEW ? Math.min(500, Math.max(1, options.previewLimit ?? 100)) : undefined
       const result = await this.extraction.extract(connector, limit)
 
       const objectCounts: Record<string, number> = {
@@ -88,8 +88,7 @@ export class LinuxSshSyncService {
       let persisted = false
       let riskScanned = false
       if (options.persist) {
-        await this.graph.upsertNodes(nodes)
-        await this.graph.upsertRelationships(relationships)
+        await this.graph.applyVersioned(`connector:${connector.id}`, nodes, relationships, { connectorId: connector.id, syncRunId: run.syncRunId, mode })
         persisted = true
       }
       if (options.runRiskScan) {
@@ -142,6 +141,7 @@ export class LinuxSshSyncService {
       connector.updatedAt = new Date().toISOString()
       this.repository.save(connector)
       this.active.delete(connector.id)
+      await this.repository.flush()
     }
   }
 }

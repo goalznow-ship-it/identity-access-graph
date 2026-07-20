@@ -44,7 +44,7 @@ function extractIds(arr: any[] | undefined): string[] {
 }
 
 export class EntraIdConnector {
-  async extract(connector: Connector, limit: number, watermark?: string, signal?: AbortSignal): Promise<{
+  async extract(connector: Connector, limit?: number, watermark?: string, signal?: AbortSignal): Promise<{
     objects: NormalizedEntraObject[]
     pageCounts: Record<string, number>
     tenantInfo: Record<string, unknown>
@@ -67,25 +67,25 @@ export class EntraIdConnector {
     if (signal?.aborted) throw new DOMException('Extraction cancelled', 'AbortError')
 
     for (const collection of collections) {
-      if (allObjects.length >= limit) break
+      if (limit !== undefined && allObjects.length >= limit) break
       let pageCount = 0
       try {
-        let url = `${collection.path}?$select=${collection.select.join(',')}&$top=${Math.min(100, limit - allObjects.length)}`
+        let url = `${collection.path}?$select=${collection.select.join(',')}&$top=${Math.min(100, limit === undefined ? 100 : limit - allObjects.length)}`
         if (watermark && (collection.type === 'USER' || collection.type === 'GROUP')) {
           url += `&$filter=createdDateTime ge ${watermark} or deletedDateTime ge ${watermark}`
         }
 
         let response = await client.api(url).get()
 
-        while (response.value && allObjects.length < limit) {
+        while (response.value && (limit === undefined || allObjects.length < limit)) {
           pageCount++
           for (const item of response.value) {
-            if (allObjects.length >= limit) break
+            if (limit !== undefined && allObjects.length >= limit) break
             const obj = normalizeEntraObject(item, collection.type, item.id)
             allObjects.push(obj)
           }
 
-          if (allObjects.length < limit && response['@odata.nextLink']) {
+          if ((limit === undefined || allObjects.length < limit) && response['@odata.nextLink']) {
             response = await client.api(response['@odata.nextLink']).get()
           } else break
         }
@@ -108,7 +108,7 @@ export class EntraIdConnector {
       }
     } catch { /* optional */ }
 
-    return { objects: allObjects.slice(0, limit), pageCounts, tenantInfo }
+    return { objects: limit === undefined ? allObjects : allObjects.slice(0, limit), pageCounts, tenantInfo }
   }
 
   async testConnection(connector: Connector): Promise<{ connected: boolean; tenantId?: string; tenantName?: string; error?: string }> {
