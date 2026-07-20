@@ -16,6 +16,7 @@ export interface UnresolvedReference { recordId: string; field: string; value: s
 
 const RULES: { fields: string[]; type: string }[] = [
   { fields: ['memberOf', 'groupName', 'linuxGroups'], type: 'MEMBER_OF' },
+  { fields: ['parentGroup'], type: 'MEMBER_OF' },
   { fields: ['department', 'team'], type: 'BELONGS_TO' },
   { fields: ['manager'], type: 'REPORTS_TO' },
   { fields: ['role', 'roleName'], type: 'HAS_ROLE' },
@@ -43,6 +44,7 @@ export function convertRelationships(records: CorrelationRecord[], recordNodeIds
   const unresolved: UnresolvedReference[] = []
   const seen = new Set<string>()
   for (const record of records) {
+    const sourceSystem = String(record.fields.sourceSystem ?? record.sourceSystem ?? 'CUSTOM').toUpperCase()
     const sourceReference = ['objectGUID', 'sid', 'distinguishedName', 'employeeId', 'username', 'samAccountName', 'userPrincipalName', 'email']
       .map((field) => record.fields[field]).find((value) => value !== undefined && value !== '')
     const source = recordNodeIds.get(record.recordId) ?? resolver.resolve(sourceReference)
@@ -56,7 +58,7 @@ export function convertRelationships(records: CorrelationRecord[], recordNodeIds
         const key = `${memberId}|MEMBER_OF|${source}`
         if (!seen.has(key)) {
           seen.add(key)
-          relationships.push({ id: deterministicId('relationship', memberId, 'MEMBER_OF', source), source: memberId, target: source, relationshipType: 'MEMBER_OF', sourceSystem: String(record.sourceSystem || 'CUSTOM').toUpperCase(), properties: { sourceField: 'members', rawReference: member } })
+          relationships.push({ id: deterministicId('relationship', memberId, 'MEMBER_OF', source), source: memberId, target: source, relationshipType: 'MEMBER_OF', sourceSystem, properties: { sourceField: 'members', rawReference: member } })
         }
       }
     }
@@ -73,7 +75,7 @@ export function convertRelationships(records: CorrelationRecord[], recordNodeIds
           seen.add(key)
           relationships.push({
             id: deterministicId('relationship', source, rule.type, target), source, target, relationshipType: rule.type,
-            sourceSystem: String(record.sourceSystem || 'CUSTOM').toUpperCase(), properties: { sourceField: field, rawReference: value },
+            sourceSystem, properties: { sourceField: field, rawReference: value },
           })
         }
       }

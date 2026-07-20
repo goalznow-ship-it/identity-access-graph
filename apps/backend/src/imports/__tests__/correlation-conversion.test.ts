@@ -77,6 +77,30 @@ describe('graph conversion', () => {
     assert.equal(result.unresolvedReferences[0].field, 'manager')
   })
 
+  it('uses merged correlation fields and retains source provenance on canonical identities', () => {
+    const records = [
+      record('ad', { employeeId: 'E1', displayName: 'Alice Directory' }, 'Users', 'ACTIVE_DIRECTORY'),
+      record('linux', { employeeId: 'E1', email: 'alice@example.com' }, 'Users', 'LINUX'),
+    ]
+    const result = conversionService.convert('import', records, correlationService.correlate('import', records))
+    const node = result.fullGraph!.nodes[0]
+    assert.equal(node.displayName, 'Alice Directory')
+    assert.equal(node.properties.email, 'alice@example.com')
+    assert.deepEqual(node.properties.sourceSystems, ['ACTIVE_DIRECTORY', 'LINUX'])
+    assert.deepEqual(node.properties.sourceRecordIds, ['ad', 'linux'])
+  })
+
+  it('converts nested groups and uses mapped relationship source provenance', () => {
+    const records = [
+      record('child', { groupName: 'Child', parentGroup: 'Parent', sourceSystem: 'FREE_IPA' }, 'Groups'),
+      record('parent', { groupName: 'Parent' }, 'Groups'),
+    ]
+    const result = conversionService.convert('import', records, correlationService.correlate('import', records))
+    const relationship = result.fullGraph!.links.find((item) => item.properties.sourceField === 'parentGroup')
+    assert.equal(relationship?.relationshipType, 'MEMBER_OF')
+    assert.equal(relationship?.sourceSystem, 'FREE_IPA')
+  })
+
   it('enforces preview limits and prevents duplicate nodes', () => {
     const records = [
       record('1', { employeeId: 'E1', displayName: 'Alice' }),

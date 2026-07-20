@@ -34,8 +34,13 @@ function first(fields: Record<string, unknown>, keys: string[]): unknown {
 export function convertNode(importId: string, record: CorrelationRecord, correlation: CorrelationResult, timestamp: string): ImportedGraphNode | null {
   const nodeType = NODE_TYPES[record.datasetType ?? '']
   if (!nodeType) return null
-  const fields = record.fields
   const correlatedId = nodeType === 'USER' || nodeType === 'SERVICE_ACCOUNT' ? correlation.recordToCanonical[record.recordId] : undefined
+  const correlationGroup = correlatedId
+    ? correlation.groups.find((group) => group.canonicalIdentityId === correlatedId)
+    : undefined
+  // A canonical identity must contain the correlation result, not whichever source
+  // record happened to be encountered first during conversion.
+  const fields = correlationGroup?.mergedFields ?? record.fields
   const naturalKey = first(fields, KEY_FIELDS[nodeType] ?? []) ?? record.recordId
   const id = correlatedId ?? deterministicId(nodeType, naturalKey)
   const displayName = String(first(fields, ['displayName', 'groupName', 'department', 'team', 'applicationName', 'databaseName', 'businessService', 'hostname', 'username', 'email', 'distinguishedName']) ?? id)
@@ -53,7 +58,9 @@ export function convertNode(importId: string, record: CorrelationRecord, correla
       sourceSheet: record.sheetName,
       rawRecordReference: { fileId: record.fileId, sheetIndex: record.sheetIndex, row: record.row },
       rawRecord: record.raw,
-      correlationConfidence: correlation.groups.find((group) => group.canonicalIdentityId === correlatedId)?.confidence ?? 'LOW',
+      sourceSystems: correlationGroup?.sourceSystems ?? [String(fields.sourceSystem ?? record.sourceSystem ?? 'CUSTOM').toUpperCase()],
+      sourceRecordIds: correlationGroup?.matchedRecordIds ?? [record.recordId],
+      correlationConfidence: correlationGroup?.confidence ?? 'LOW',
       validationStatus: record.validationStatus ?? 'VALID',
       createdAt: timestamp,
       updatedAt: timestamp,
