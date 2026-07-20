@@ -161,6 +161,19 @@ export class ImportRowChunkEntity {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
 }
 
+@Entity('import_graph_chunks')
+@Index(['importId', 'kind', 'chunkIndex'], { unique: true })
+export class ImportGraphChunkEntity {
+  @PrimaryGeneratedColumn('increment', { type: 'bigint' }) id!: string
+  @Column('uuid', { name: 'import_id' }) importId!: string
+  @Column({ type: 'varchar', length: 16 }) kind!: 'NODE' | 'RELATIONSHIP'
+  @Column({ name: 'chunk_index', type: 'integer' }) chunkIndex!: number
+  @Column({ name: 'item_start', type: 'integer' }) itemStart!: number
+  @Column({ name: 'item_end', type: 'integer' }) itemEnd!: number
+  @Column({ type: 'jsonb' }) items!: Record<string, unknown>[]
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date
+}
+
 @Entity('import_audit_log')
 @Index(['importId', 'createdAt'])
 export class ImportAuditLogEntity {
@@ -205,4 +218,4 @@ export class GraphVersionEntity {
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true }) completedAt!: Date | null
 }
 
-export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, RiskScanRunEntity, AttackPathEntity, AttackPathRunEntity, NotificationEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity, GraphVersionEntity]
+export const DATABASE_ENTITIES = [ConnectorEntity, ConnectorSyncRunEntity, ImportSessionEntity, GraphSnapshotEntity, RiskFindingEntity, RiskScanRunEntity, AttackPathEntity, AttackPathRunEntity, NotificationEntity, EnterpriseIdentityEntity, PipelineRunEntity, OperationalMetadataEntity, ImportJobEntity, ImportRowChunkEntity, ImportGraphChunkEntity, ImportAuditLogEntity, ImportValidationIssueEntity, GraphVersionEntity]

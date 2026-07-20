@@ -3,6 +3,7 @@ import { EnterpriseGraphService, GraphService } from '../graph'
 import type { PersistedGraphNode, PersistedGraphRelationship } from '../graph'
 import { ImportsService } from './imports.service'
 import { RiskGraphSourceService } from '../risk'
+import { ImportGraphChunkService } from './import-graph-chunk.service'
 
 export interface ImportPersistenceSummary {
   nodesUpserted: number
@@ -26,6 +27,7 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     private readonly graph: GraphService,
     @Optional() private readonly riskSource?: RiskGraphSourceService,
     @Optional() private readonly enterpriseGraph?: EnterpriseGraphService,
+    @Optional() private readonly graphChunks?: ImportGraphChunkService,
   ) {}
 
   persistConvertedGraph(importId: string) { return this.persist(importId) }
@@ -35,7 +37,7 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     const started = Date.now()
     const conversion = this.imports.getConversionResult(importId)
     if (!conversion) throw new NotFoundException('Graph conversion has not been run')
-    const completeGraph = conversion.fullGraph ?? conversion.preview
+    const completeGraph = conversion.fullGraph ?? await this.graphChunks?.load(importId) ?? conversion.preview
     await this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
 
     const persistenceEnabled = typeof (this.graph as any).isPersistenceEnabled === 'function' ? (this.graph as any).isPersistenceEnabled() : true

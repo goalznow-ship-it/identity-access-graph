@@ -328,6 +328,16 @@ export class ImportsService implements OnModuleInit {
       file.status = 'error'
       const retried = await this.retryFile(job.importId, job.fileId, true)
       if (!retried || retried.files.find((item) => item.id === job.fileId)?.status === 'error') throw new Error(file.error ?? 'File processing failed.')
+      if (this.chunks) {
+        for (let sheetIndex = 0; sheetIndex < file.sheets.length; sheetIndex++) {
+          const key = this.sheetKey(job.importId, job.fileId, sheetIndex)
+          const rows = this.fullRowsCache.get(key) ?? []
+          for (let start = 0, chunkIndex = 0; start < rows.length; start += IMPORT_CONFIG.chunkSizeRows, chunkIndex++) {
+            await this.chunks.append(job.importId, job.fileId, sheetIndex, chunkIndex, start + 1, rows.slice(start, start + IMPORT_CONFIG.chunkSizeRows))
+          }
+          this.fullRowsCache.delete(key)
+        }
+      }
     }
     const rows = file.sheets.reduce((sum, sheet) => sum + sheet.rowCount, 0)
     const terminal = session.files.every((item) => item.status === 'inspected' || item.status === 'error')
@@ -458,6 +468,8 @@ export class ImportsService implements OnModuleInit {
   getConversionResult(importId: string): ConversionResult | undefined {
     return this.conversionCache.get(importId)
   }
+
+  async flushPersistence(): Promise<void> { await this.store?.flush() }
 
   clearDerivedResults(importId: string): void {
     this.correlationCache.delete(importId)

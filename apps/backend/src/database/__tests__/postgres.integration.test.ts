@@ -29,6 +29,7 @@ import { EnterpriseGraphEngine1721553600000 } from '../migrations/1721553600000-
 import { EnterpriseRiskEngine1721640000000 } from '../migrations/1721640000000-EnterpriseRiskEngine'
 import { EnterpriseAttackPathEngine1721726400000 } from '../migrations/1721726400000-EnterpriseAttackPathEngine'
 import { EnterpriseNotifications1721812800000 } from '../migrations/1721812800000-EnterpriseNotifications'
+import { ImportGraphChunks1721900000000 } from '../migrations/1721900000000-ImportGraphChunks'
 import { OperationalStoreService } from '../operational-store.service'
 import { ImportQueueService } from '../../imports/import-queue.service'
 import { ImportReportingService } from '../../imports/import-reporting.service'
@@ -60,7 +61,7 @@ describe('PostgreSQL persistence integration', { skip: databaseUrl ? false : 'TE
       type: 'postgres',
       url: databaseUrl,
       entities: DATABASE_ENTITIES,
-      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000, EnterpriseAttackPathEngine1721726400000, EnterpriseNotifications1721812800000],
+      migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000, EnterpriseAttackPathEngine1721726400000, EnterpriseNotifications1721812800000, ImportGraphChunks1721900000000],
       synchronize: false,
     })
     await dataSource.initialize()

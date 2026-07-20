@@ -8,6 +8,7 @@ import { EnterpriseGraphEngine1721553600000 } from './migrations/1721553600000-E
 import { EnterpriseRiskEngine1721640000000 } from './migrations/1721640000000-EnterpriseRiskEngine'
 import { EnterpriseAttackPathEngine1721726400000 } from './migrations/1721726400000-EnterpriseAttackPathEngine'
 import { EnterpriseNotifications1721812800000 } from './migrations/1721812800000-EnterpriseNotifications'
+import { ImportGraphChunks1721900000000 } from './migrations/1721900000000-ImportGraphChunks'
 import { DatabaseHealthService } from './database-health.service'
 import { OperationalStoreService } from './operational-store.service'
 
@@ -23,7 +24,7 @@ import { OperationalStoreService } from './operational-store.service'
           type: 'postgres' as const,
           url,
           entities: DATABASE_ENTITIES,
-          migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000, EnterpriseAttackPathEngine1721726400000, EnterpriseNotifications1721812800000],
+          migrations: [InitialOperationalPersistence1721380800000, EnterpriseImportEngine1721467200000, EnterpriseGraphEngine1721553600000, EnterpriseRiskEngine1721640000000, EnterpriseAttackPathEngine1721726400000, EnterpriseNotifications1721812800000, ImportGraphChunks1721900000000],
           migrationsRun: true,
           synchronize: false,
           connectTimeoutMS: config.get<number>('database.connectTimeoutMs') ?? 5000,

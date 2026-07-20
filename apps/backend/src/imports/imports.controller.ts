@@ -14,6 +14,7 @@ import { IdentityCorrelationService, type CorrelationOptions, type CorrelationRe
 import { GraphConversionService } from './graph-conversion'
 import { deterministicId } from './graph-conversion/deterministic-id'
 import { ImportGraphPersistenceService } from './import-graph-persistence.service'
+import { ImportGraphChunkService } from './import-graph-chunk.service'
 import { ImportReportingService } from './import-reporting.service'
 import type { Response } from 'express'
 
@@ -27,6 +28,7 @@ export class ImportsController {
     private readonly correlationService: IdentityCorrelationService,
     private readonly conversionService: GraphConversionService,
     private readonly persistenceService: ImportGraphPersistenceService,
+    private readonly graphChunks: ImportGraphChunkService,
     private readonly reporting: ImportReportingService,
   ) {}
 
@@ -360,6 +362,8 @@ export class ImportsController {
   private async buildCorrelationRecords(importId: string): Promise<CorrelationRecord[]> {
     const session = this.service.getSession(importId)
     if (!session) throw new HttpException('Session not found.', HttpStatus.NOT_FOUND)
+    const truncatedSheets = session.files.flatMap((file) => file.sheets.filter((sheet) => sheet.warnings.some((warning) => warning.type === 'truncated')).map((sheet) => `${file.originalName}/${sheet.name}`))
+    if (truncatedSheets.length) throw new HttpException(`Conversion refused because source rows were truncated: ${truncatedSheets.join(', ')}`, HttpStatus.PAYLOAD_TOO_LARGE)
     const validations = this.service.getValidationResults(importId)
     const records: CorrelationRecord[] = []
     for (const file of session.files) {
@@ -411,7 +415,10 @@ export class ImportsController {
       body.nodeLimit ?? IMPORT_CONFIG.maxGraphPreviewNodes,
       body.relationshipLimit ?? IMPORT_CONFIG.maxGraphPreviewRelationships,
     )
-    this.service.setConversionResult(importId, result)
+    await this.graphChunks.replace(importId, result.fullGraph!.nodes, result.fullGraph!.links, IMPORT_CONFIG.chunkSizeRows)
+    const durableResult = { ...result, fullGraph: undefined }
+    this.service.setConversionResult(importId, durableResult)
+    await this.service.flushPersistence()
     const { fullGraph: _fullGraph, ...response } = result
     return response
   }

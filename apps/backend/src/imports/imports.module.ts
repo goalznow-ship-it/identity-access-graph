@@ -13,11 +13,12 @@ import { ImportWorkerService } from './import-worker.service'
 import { ImportWorkerController } from './import-worker.controller'
 import { ImportChunkService } from './import-chunk.service'
 import { ImportReportingService } from './import-reporting.service'
+import { ImportGraphChunkService } from './import-graph-chunk.service'
 
 @Module({
   imports: [GraphModule, RiskModule],
   controllers: [ImportsController, ImportWorkerController],
-  providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService, ImportQueueService, ImportWorkerService, ImportChunkService, ImportReportingService],
+  providers: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService, ImportQueueService, ImportWorkerService, ImportChunkService, ImportGraphChunkService, ImportReportingService],
   exports: [ImportsService, MappingService, ValidationService, IdentityCorrelationService, GraphConversionService, ImportGraphPersistenceService],
 })
 export class ImportsModule {}

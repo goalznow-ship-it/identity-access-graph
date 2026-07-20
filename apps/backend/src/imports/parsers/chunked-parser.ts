@@ -41,7 +41,7 @@ export async function parseExcelChunked(filePath: string, callbacks: ChunkCallba
   for (let sheetIndex = 0; sheetIndex < Math.min(workbook.SheetNames.length, IMPORT_CONFIG.maxSheetsPerWorkbook); sheetIndex++) {
     const name = workbook.SheetNames[sheetIndex], worksheet = workbook.Sheets[name], range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1:A1')
     const headers = (XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, range: range.s.r, blankrows: false })[0] ?? []).map(String)
-    const previewRows: Record<string, unknown>[] = []; let rowCount = 0, chunkIndex = 0
+    const previewRows: Record<string, unknown>[] = [], warnings: SheetWarning[] = []; let rowCount = 0, chunkIndex = 0
     for (let start = range.s.r + 1; start <= range.e.r; start += IMPORT_CONFIG.chunkSizeRows) {
       if (callbacks.isCancelled()) throw new Error('Import was cancelled.')
       const end = Math.min(range.e.r, start + IMPORT_CONFIG.chunkSizeRows - 1)
@@ -50,9 +50,12 @@ export async function parseExcelChunked(filePath: string, callbacks: ChunkCallba
       previewRows.push(...rows.slice(0, Math.max(0, IMPORT_CONFIG.previewRows - previewRows.length)))
       await callbacks.onChunk(sheetIndex, chunkIndex++, rowCount + 1, rows); rowCount += rows.length
       await callbacks.onProgress({ phase: 'parsing', sheetIndex, rowsProcessed: rowCount, chunkIndex })
-      if (rowCount >= IMPORT_CONFIG.maxRowsPerSheet) break
+      if (rowCount >= IMPORT_CONFIG.maxRowsPerSheet) {
+        if (end < range.e.r) warnings.push({ type: 'truncated', message: `Row limit of ${IMPORT_CONFIG.maxRowsPerSheet} reached on sheet "${name}"; conversion is blocked until the limit is raised or the source is split.` })
+        break
+      }
     }
-    results.push({ name, rowCount, columnCount: headers.length, headers, previewRows, warnings: [], classification: 'Unknown', classificationConfidence: 0, allRows: [] })
+    results.push({ name, rowCount, columnCount: headers.length, headers, previewRows, warnings, classification: 'Unknown', classificationConfidence: 0, allRows: [] })
   }
   return results
 }
