@@ -35,9 +35,10 @@ export class GraphConversionService {
     const timestamp = new Date().toISOString()
     const nodeMap = new Map<string, ImportedGraphNode>()
     const recordNodeIds = new Map<string, string>()
+    const correlationGroups = new Map(correlation.groups.map((group) => [group.canonicalIdentityId, group]))
     let duplicateNodesSkipped = 0
     for (const record of records) {
-      const node = convertNode(importId, record, correlation, timestamp)
+      const node = convertNode(importId, record, correlation, timestamp, correlationGroups.get(correlation.recordToCanonical[record.recordId]))
       if (!node) continue
       recordNodeIds.set(record.recordId, node.id)
       if (nodeMap.has(node.id)) { duplicateNodesSkipped++; continue }

@@ -26,21 +26,31 @@ export interface CorrelationResult {
 @Injectable()
 export class IdentityCorrelationService {
   correlate(importId: string, records: CorrelationRecord[], options: CorrelationOptions = {}): CorrelationResult {
-    const groups: { records: CorrelationRecord[]; method: MatchMethod; confidence: CorrelationConfidence; conflicts: string[] }[] = []
+    type WorkingGroup = { records: CorrelationRecord[]; method: MatchMethod; confidence: CorrelationConfidence; conflicts: string[] }
+    const groups: WorkingGroup[] = []
+    const indexes = new Map<string, WorkingGroup>()
+    const register = (group: WorkingGroup, record: CorrelationRecord) => {
+      for (const strategy of STRATEGIES) {
+        const value = strategy.normalize(record.fields[strategy.field])
+        if (value && !indexes.has(`${strategy.field}:${value}`)) indexes.set(`${strategy.field}:${value}`, group)
+      }
+      const key = compositeKey(record, options.compositeKeyFields)
+      if (key && !indexes.has(`composite:${key}`)) indexes.set(`composite:${key}`, group)
+    }
     for (const record of records) {
-      let target: typeof groups[number] | undefined
+      let target: WorkingGroup | undefined
       let method: MatchMethod = 'none'
       let confidence: CorrelationConfidence = 'LOW'
       for (const strategy of STRATEGIES) {
         const value = strategy.normalize(record.fields[strategy.field])
         if (!value) continue
-        target = groups.find((group) => group.records.some((candidate) => strategy.normalize(candidate.fields[strategy.field]) === value))
+        target = indexes.get(`${strategy.field}:${value}`)
         if (target) { method = strategy.method; confidence = strategy.confidence; break }
       }
       if (!target) {
         const key = compositeKey(record, options.compositeKeyFields)
         if (key) {
-          target = groups.find((group) => compositeKey(group.records[0], options.compositeKeyFields) === key)
+          target = indexes.get(`composite:${key}`)
           if (target) { method = 'compositeKey'; confidence = 'LOW' }
         }
       }
@@ -49,13 +59,15 @@ export class IdentityCorrelationService {
         if (strongConflicts.length > 0) {
           target.confidence = 'CONFLICT'
           target.conflicts.push(...strongConflicts)
-          groups.push({ records: [record], method: 'none', confidence: 'CONFLICT', conflicts: strongConflicts })
+          const conflictGroup = { records: [record], method: 'none' as const, confidence: 'CONFLICT' as const, conflicts: strongConflicts }
+          groups.push(conflictGroup); register(conflictGroup, record)
         } else {
           target.records.push(record)
+          register(target, record)
           target.method = target.method === 'none' ? method : target.method
           target.confidence = strongConflicts.length ? 'CONFLICT' : confidence
         }
-      } else groups.push({ records: [record], method: 'none', confidence: 'LOW', conflicts: [] })
+      } else { const group = { records: [record], method: 'none' as const, confidence: 'LOW' as const, conflicts: [] as string[] }; groups.push(group); register(group, record) }
     }
 
     const recordToCanonical: Record<string, string> = {}

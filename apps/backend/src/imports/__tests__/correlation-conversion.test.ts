@@ -48,6 +48,14 @@ describe('identity correlation', () => {
     assert.equal(merged.displayName, 'Directory Name')
     assert.equal(merged.email, 'linux@example.com')
   })
+
+  it('indexes complete datasets larger than preview limits without changing identity counts', () => {
+    const records = Array.from({ length: 1200 }, (_, index) => record(`record-${index}`, { employeeId: `E${index}`, email: `user${index}@example.com` }))
+    const result = service.correlate('large-import', records)
+    assert.equal(result.summary.records, 1200)
+    assert.equal(result.summary.identities, 1200)
+    assert.equal(Object.keys(result.recordToCanonical).length, 1200)
+  })
 })
 
 describe('graph conversion', () => {

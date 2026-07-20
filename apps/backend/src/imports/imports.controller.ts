@@ -365,6 +365,7 @@ export class ImportsController {
     const truncatedSheets = session.files.flatMap((file) => file.sheets.filter((sheet) => sheet.warnings.some((warning) => warning.type === 'truncated')).map((sheet) => `${file.originalName}/${sheet.name}`))
     if (truncatedSheets.length) throw new HttpException(`Conversion refused because source rows were truncated: ${truncatedSheets.join(', ')}`, HttpStatus.PAYLOAD_TOO_LARGE)
     const validations = this.service.getValidationResults(importId)
+    const invalidRows = new Set(validations.flatMap((result) => result.issues.filter((issue) => ['ERROR', 'CRITICAL'].includes(issue.severity)).map((issue) => `${result.fileId}:${result.sheetIndex}:${issue.row}`)))
     const records: CorrelationRecord[] = []
     for (const file of session.files) {
       for (let sheetIndex = 0; sheetIndex < file.sheets.length; sheetIndex++) {
@@ -373,9 +374,8 @@ export class ImportsController {
           ?? this.mappingService.suggestMappings(sheet.headers, sheet.previewRows, sheet.classification)
         const rows = await this.service.getSheetRows(importId, file.id, sheetIndex)
         const normalized = generateNormalizedPreview(rows, mappings, rows.length)
-        const validation = validations.find((result) => result.fileId === file.id && result.sheetIndex === sheetIndex)
         for (const record of normalized) {
-          const hasError = validation?.issues.some((issue) => issue.row === record.row && ['ERROR', 'CRITICAL'].includes(issue.severity))
+          const hasError = invalidRows.has(`${file.id}:${sheetIndex}:${record.row}`)
           records.push({
             recordId: deterministicId('record', importId, file.id, sheetIndex, record.row),
             sourceSystem: String(record.mapped.sourceSystem ?? 'CUSTOM'), fields: record.mapped,

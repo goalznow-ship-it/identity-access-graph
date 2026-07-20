@@ -1,5 +1,5 @@
 import type { CorrelationRecord } from '../correlation'
-import type { CorrelationResult } from '../correlation/identity-correlation.service'
+import type { CorrelationGroup, CorrelationResult } from '../correlation/identity-correlation.service'
 import { deterministicId } from './deterministic-id'
 
 export interface ImportedGraphNode {
@@ -31,13 +31,13 @@ function first(fields: Record<string, unknown>, keys: string[]): unknown {
   return keys.map((key) => fields[key]).find((value) => value !== undefined && value !== '')
 }
 
-export function convertNode(importId: string, record: CorrelationRecord, correlation: CorrelationResult, timestamp: string): ImportedGraphNode | null {
+export function convertNode(importId: string, record: CorrelationRecord, correlation: CorrelationResult, timestamp: string, knownCorrelationGroup?: CorrelationGroup): ImportedGraphNode | null {
   const nodeType = NODE_TYPES[record.datasetType ?? '']
   if (!nodeType) return null
   const correlatedId = nodeType === 'USER' || nodeType === 'SERVICE_ACCOUNT' ? correlation.recordToCanonical[record.recordId] : undefined
-  const correlationGroup = correlatedId
+  const correlationGroup = knownCorrelationGroup ?? (correlatedId
     ? correlation.groups.find((group) => group.canonicalIdentityId === correlatedId)
-    : undefined
+    : undefined)
   // A canonical identity must contain the correlation result, not whichever source
   // record happened to be encountered first during conversion.
   const fields = correlationGroup?.mergedFields ?? record.fields
