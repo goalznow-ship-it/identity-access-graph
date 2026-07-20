@@ -1,0 +1,4 @@
+username,manager,department,role,group
+alice,bob,Finance,Analyst,Finance-Users
+bob,,Finance,Manager,Finance-Admins
+charlie,bob,IT,Engineer,IT-Users
