@@ -17,6 +17,7 @@ const NODE_TYPES: Record<string, string> = {
   Computers: 'COMPUTER', 'Linux Hosts': 'HOST', 'Linux Users': 'LINUX_USER', 'Linux Groups': 'LINUX_GROUP',
   'Sudo Policies': 'SUDO_POLICY', 'SSH Keys': 'SSH_KEY', Applications: 'APPLICATION', Databases: 'DATABASE',
   'Business Services': 'BUSINESS_SERVICE', 'Service Accounts': 'SERVICE_ACCOUNT', 'Organizational Units': 'ORGANIZATIONAL_UNIT', Domains: 'DOMAIN',
+  'Group Memberships': 'USER', Managers: 'USER',
 }
 
 const KEY_FIELDS: Record<string, string[]> = {
@@ -43,7 +44,7 @@ export function convertNode(importId: string, record: CorrelationRecord, correla
   const fields = correlationGroup?.mergedFields ?? record.fields
   const naturalKey = first(fields, KEY_FIELDS[nodeType] ?? []) ?? record.recordId
   const id = correlatedId ?? deterministicId(nodeType, naturalKey)
-  const displayName = String(first(fields, ['displayName', 'groupName', 'department', 'team', 'applicationName', 'databaseName', 'businessService', 'hostname', 'username', 'email', 'distinguishedName']) ?? id)
+  const displayName = String(first(fields, nodeType === 'USER' ? ['displayName', 'username', 'email', 'distinguishedName', 'groupName'] : ['displayName', 'groupName', 'department', 'team', 'applicationName', 'databaseName', 'businessService', 'hostname', 'username', 'email', 'distinguishedName']) ?? id)
   return {
     id,
     displayName,
