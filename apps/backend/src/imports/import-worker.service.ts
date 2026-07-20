@@ -26,7 +26,7 @@ export class ImportWorkerService implements OnApplicationBootstrap, OnModuleDest
       this.active++
       void this.imports.processQueuedJob(job, (checkpoint) => this.queue.checkpoint(job.id, checkpoint))
         .then(() => this.queue.complete(job))
-        .catch(async (error: Error) => { this.lastError = error.message; this.logger.error(`Import job ${job.id} failed: ${error.message}`); await this.queue.fail(job, error) })
+        .catch(async (error: Error) => { this.lastError = error.message; this.logger.error(`Import job ${job.id} failed: ${error.message}`); await this.queue.fail(job, error); this.imports.markFileFailed(job.importId, job.fileId, error.message) })
         .finally(() => { this.active--; void this.tick() })
     }
   }

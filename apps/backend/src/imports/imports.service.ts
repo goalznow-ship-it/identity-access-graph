@@ -63,6 +63,22 @@ export class ImportsService implements OnModuleInit {
     for (const row of await this.store.loadImports()) {
       this.restorePayload(row.payload)
     }
+    await this.recoverStaleSessions()
+  }
+
+  private async recoverStaleSessions(): Promise<void> {
+    if (!this.queue) return
+    for (const [importId, session] of this.sessions) {
+      if (session.progress?.status !== 'parsing' && session.progress?.status !== 'uploading') continue
+      const jobs = await this.queue.jobsFor(importId)
+      if (jobs.length === 0) continue
+      const allTerminal = jobs.every((j) => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(j.status))
+      if (allTerminal && jobs.some((j) => j.status === 'FAILED')) {
+        const lastError = jobs.filter((j) => j.status === 'FAILED').pop()?.error ?? 'Unknown error'
+        this.logger.warn(`Recovering stale session ${importId} — marking as failed: ${lastError}`)
+        this.markFailed(importId, lastError)
+      }
+    }
   }
 
   getLimits(): ImportLimits {
@@ -237,6 +253,22 @@ export class ImportsService implements OnModuleInit {
     this.updateProgress(importId, { status: 'cancelled' })
     this.cleanupSessionFiles(importId)
     return true
+  }
+
+  markFileFailed(importId: string, fileId: string, error: string): void {
+    const session = this.sessions.get(importId)
+    if (!session) return
+    const file = session.files.find((item) => item.id === fileId)
+    if (file) { file.status = 'error'; file.error = error }
+    this.markFailed(importId, error)
+  }
+
+  private markFailed(importId: string, error: string): void {
+    const session = this.sessions.get(importId)
+    if (!session) return
+    const elapsedMs = Date.now() - session.createdAt
+    session.progress = { ...session.progress!, status: 'failed', filesCompleted: session.files.filter((f) => f.status === 'inspected').length, filesFailed: session.files.filter((f) => f.status === 'error').length, elapsedMs }
+    this.persistSnapshot(importId)
   }
 
   async retryFile(importId: string, fileId: string, inline = false): Promise<ImportSession | null> {
