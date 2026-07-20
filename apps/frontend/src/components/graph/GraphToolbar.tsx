@@ -19,6 +19,7 @@ interface GraphToolbarProps {
   highlightMode: HighlightMode
   onHighlightModeChange: (mode: HighlightMode) => void
   hasSelection: boolean
+  hasRelationships: boolean
   source: GraphSourceMode
   importedAvailable: boolean
   onSourceChange: (source: GraphSourceMode) => void
@@ -61,6 +62,7 @@ export function GraphToolbar({
   highlightMode,
   onHighlightModeChange,
   hasSelection,
+  hasRelationships,
   source,
   importedAvailable,
   onSourceChange,
@@ -84,9 +86,9 @@ export function GraphToolbar({
 
       <button className={btn} onClick={onSearch} title="Search (Ctrl+K)"><IconSearch /></button>
       <button className={btn} onClick={onFilters} title="Toggle filters"><IconFilter /></button>
-      <button className={btn} onClick={onShortestPath} title="Shortest path"><IconPath /></button>
-      <button className={btn} onClick={onBlastRadius} title="Blast radius"><IconBlast /></button>
-      <button className={btn} onClick={onAttackPath} title="Attack path"><IconAttack /></button>
+      <button className={`${btn} ${!hasRelationships ? 'cursor-not-allowed opacity-30' : ''}`} onClick={onShortestPath} title="Shortest path" disabled={!hasRelationships}><IconPath /></button>
+      <button className={`${btn} ${!hasRelationships ? 'cursor-not-allowed opacity-30' : ''}`} onClick={onBlastRadius} title="Blast radius" disabled={!hasRelationships}><IconBlast /></button>
+      <button className={`${btn} ${!hasRelationships ? 'cursor-not-allowed opacity-30' : ''}`} onClick={onAttackPath} title="Attack path" disabled={!hasRelationships}><IconAttack /></button>
 
       <select aria-label="Export graph" title="Export" defaultValue="" onChange={(event) => { if (event.target.value) onExport(event.target.value as 'png' | 'json' | 'csv' | 'cypher'); event.currentTarget.value = '' }} className="h-7 rounded-md border border-border bg-card px-1.5 text-[10px] uppercase tracking-wider"><option value="">Export</option><option value="png">PNG</option><option value="json">JSON</option><option value="csv">CSV</option><option value="cypher">Cypher</option></select>
 

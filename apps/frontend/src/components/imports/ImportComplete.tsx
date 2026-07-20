@@ -65,7 +65,7 @@ export function ImportComplete({ importId, persistenceSummary, session, correlat
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
-          onClick={() => window.open(`/graph?importId=${importId}`, '_blank')}
+          onClick={() => window.open(`/graph?source=imported&importId=${importId}`, '_blank')}
           className="inline-flex items-center gap-2"
         >
           <ExternalLink className="h-4 w-4" />

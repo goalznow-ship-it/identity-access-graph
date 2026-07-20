@@ -52,6 +52,7 @@ export function GraphPage() {
   const [remoteFilters, setRemoteFilters] = useState<Record<string, unknown>>(backendFilters)
   const { data, loading, error, retry, partial, expanding, expandRemote, fallbackNotice: importFallbackNotice } = useGraphData(source === 'imported' ? importedId : null, source, remoteFilters)
   const links = data?.links ?? []
+  const hasRelationships = links.length > 0
   const {
     selectedNode,
     highlightMode,
@@ -226,7 +227,7 @@ export function GraphPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="p-6 text-center">
-          <p className="text-gray-400">{source==='neo4j'?'Neo4j Live returned no graph objects.':'No graph data matches the current workspace.'}</p><div className="mt-3 flex justify-center gap-2"><button onClick={clearGraphFilters} className="rounded bg-primary px-3 py-1.5 text-xs">Clear filters</button>{source==='neo4j'&&<button onClick={()=>void retry()} className="rounded border border-border px-3 py-1.5 text-xs">Retry</button>}</div>
+          <p className="text-gray-400">{source==='neo4j'?'Neo4j Live returned no graph objects.':source==='imported'?'The imported session has no graph data.':'No graph data matches the current workspace.'}</p><div className="mt-3 flex justify-center gap-2"><button onClick={clearGraphFilters} className="rounded bg-primary px-3 py-1.5 text-xs">Clear filters</button>{source==='neo4j'&&<button onClick={()=>void retry()} className="rounded border border-border px-3 py-1.5 text-xs">Retry</button>}{source==='imported'&&<button onClick={() => navigate('/imports')} className="rounded border border-border px-3 py-1.5 text-xs">Open Imports</button>}</div>
         </Card>
       </div>
     )
@@ -330,6 +331,7 @@ export function GraphPage() {
             highlightMode={highlightMode}
             onHighlightModeChange={setHighlightMode}
             hasSelection={selectedNode !== null}
+            hasRelationships={hasRelationships}
             source={source}
             importedAvailable={importedAvailable}
             onSourceChange={handleSourceChange}
@@ -348,10 +350,19 @@ export function GraphPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-100">No relationship data</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-400">This dataset has {investigation.focusedData.nodes.length} nodes but no relationships. Path analysis requires relationship data.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-400">{source === 'imported' ? 'This imported session has nodes but no relationships were generated from the data.' : `This dataset has ${investigation.focusedData.nodes.length} nodes but no relationships.`} Path analysis requires relationship data.</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button onClick={() => navigate('/imports')} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-hover">Import relationship data</button>
-                    {DEMO_DATA_ENABLED&&<button onClick={() => setSource('mock')} className="rounded-lg border border-border px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5">Try demo graph</button>}
+                    {source === 'imported' ? (
+                      <>
+                        <button onClick={() => navigate(`/imports/${importedId}`)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-hover">Review mappings</button>
+                        <button onClick={() => navigate('/imports')} className="rounded-lg border border-border px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5">Import more data</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => navigate('/imports')} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-hover">Import relationship data</button>
+                        {DEMO_DATA_ENABLED&&<button onClick={() => setSource('mock')} className="rounded-lg border border-border px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5">Try demo graph</button>}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
