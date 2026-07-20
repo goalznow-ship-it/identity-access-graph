@@ -37,11 +37,10 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     const started = Date.now()
     const conversion = this.imports.getConversionResult(importId)
     if (!conversion) throw new NotFoundException('Graph conversion has not been run')
-    const completeGraph = conversion.fullGraph ?? await this.graphChunks?.load(importId) ?? conversion.preview
-    await this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
-
     const persistenceEnabled = typeof (this.graph as any).isPersistenceEnabled === 'function' ? (this.graph as any).isPersistenceEnabled() : true
     if (!persistenceEnabled) {
+      const completeGraph = conversion.fullGraph ?? await this.graphChunks?.load(importId) ?? conversion.preview
+      await this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
       return {
         nodesUpserted: conversion.nodesCreated,
         relationshipsUpserted: conversion.relationshipsCreated,
@@ -53,6 +52,11 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
       }
     }
 
+    if (this.enterpriseGraph && this.graphChunks && !conversion.fullGraph) {
+      const version = await this.enterpriseGraph.applyChunks({ source: `import:${importId}`, description: `Imported graph ${importId}`, metadata: { importId } }, this.graphChunks.read<PersistedGraphNode>(importId, 'NODE'), this.graphChunks.read<PersistedGraphRelationship>(importId, 'RELATIONSHIP'))
+      return { nodesUpserted: version.counts.nodesAdded + version.counts.nodesUpdated, relationshipsUpserted: version.counts.relationshipsAdded + version.counts.relationshipsUpdated, skipped: conversion.duplicateNodesSkipped, conflicts: conversion.conflicts.length, durationMs: Date.now() - started, storageMode: 'neo4j' }
+    }
+    const completeGraph = conversion.fullGraph ?? await this.graphChunks?.load(importId) ?? conversion.preview
     const nodes = completeGraph.nodes as PersistedGraphNode[]
     const relationships = completeGraph.links as PersistedGraphRelationship[]
     if (this.enterpriseGraph) {

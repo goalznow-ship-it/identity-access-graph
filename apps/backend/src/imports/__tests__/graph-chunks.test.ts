@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { ImportGraphChunkService } from '../import-graph-chunk.service'
+import { ImportGraphPersistenceService } from '../import-graph-persistence.service'
 
 describe('durable import graph chunks', () => {
   it('persists and restores a complete graph larger than preview and chunk limits', async () => {
@@ -22,5 +23,23 @@ describe('durable import graph chunks', () => {
     assert.equal(restored.links.length, 151)
     assert.equal(restored.nodes.at(-1)?.id, 'n204')
     assert.equal(restored.links.at(-1)?.id, 'r150')
+  })
+
+  it('streams durable chunks into one enterprise graph version instead of persisting the preview', async () => {
+    const conversion = { nodesCreated: 205, relationshipsCreated: 151, duplicateNodesSkipped: 0, conflicts: [], preview: { nodes: [{ id: 'preview' }], links: [] } }
+    const graphChunks = {
+      read: async function* (_importId: string, kind: string) { yield kind === 'NODE' ? [{ id: 'n1' }, { id: 'n2' }] : [{ id: 'r1' }] },
+    }
+    let nodes = 0, relationships = 0
+    const enterprise = { applyChunks: async (_update: any, nodeChunks: AsyncIterable<any[]>, relationshipChunks: AsyncIterable<any[]>) => {
+      for await (const chunk of nodeChunks) nodes += chunk.length
+      for await (const chunk of relationshipChunks) relationships += chunk.length
+      return { counts: { nodesAdded: nodes, nodesUpdated: 0, relationshipsAdded: relationships, relationshipsUpdated: 0 } }
+    } }
+    const service = new ImportGraphPersistenceService({ getConversionResult: () => conversion } as any, { isPersistenceEnabled: () => true } as any, undefined, enterprise as any, graphChunks as any)
+    const result = await service.persistConvertedGraph('import-1')
+    assert.equal(nodes, 2)
+    assert.equal(relationships, 1)
+    assert.equal(result.storageMode, 'neo4j')
   })
 })
