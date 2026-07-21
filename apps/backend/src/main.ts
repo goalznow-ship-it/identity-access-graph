@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import helmet from 'helmet'
 import { AppModule } from './app/app.module'
+import { RateLimiterGuard } from './common/rate-limiter.guard'
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap')
@@ -14,6 +16,10 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
+
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }))
+
+  app.useGlobalGuards(new RateLimiterGuard(100, 60000))
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -36,11 +42,20 @@ async function bootstrap() {
   await app.listen(port)
   logger.log(`Application running on http://localhost:${port}`)
   logger.log(`Swagger docs at http://localhost:${port}/api/docs`)
+
+  const signals = ['SIGTERM', 'SIGINT']
+  for (const signal of signals) {
+    process.on(signal, async () => {
+      logger.log(`Received ${signal}, shutting down gracefully...`)
+      await app.close()
+      process.exit(0)
+    })
+  }
 }
 bootstrap().catch((error: unknown) => {
   const logger = new Logger('Bootstrap')
   const message = error instanceof Error ? error.message : String(error)
   logger.error(`Backend startup failed: ${message}`)
-  logger.error('Verify DATABASE_URL points to an available PostgreSQL database and that migrations can be applied.')
+  logger.error('Verify DATABASE_URL points to an available PostgreSQL database, AUTH_ENABLED=true requires JWT_SECRET (min 32 chars), and that migrations can be applied.')
   process.exitCode = 1
 })
