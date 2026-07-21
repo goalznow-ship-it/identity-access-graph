@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_ENV: test
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: identity_graph
+          POSTGRES_USER: identity_graph
+          POSTGRES_PASSWORD: test-password
+        options: >-
+          --health-cmd pg_isready -U identity_graph
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/backend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run test:unit
+        env:
+          DATABASE_URL: postgresql://identity_graph:test-password@localhost:5432/identity_graph
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://identity_graph:test-password@localhost:5432/identity_graph
+      - run: npm run migration:run
+        env:
+          DATABASE_URL: postgresql://identity_graph:test-password@localhost:5432/identity_graph
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check for uncommitted files
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Uncommitted files detected:"
+            git status --porcelain
+            exit 1
+          fi
+      - name: Check for console.log in production code
+        run: |
+          ! grep -rn "console\.log" apps/backend/src/ apps/frontend/src/ \
+            --include='*.ts' --include='*.tsx' \
+            | grep -v node_modules \
+            | grep -v __tests__ \
+            | grep -v '.test.' \
+            | grep -v 'src/main.ts' \
+            | grep -v 'runtimeConfig.ts' \
+            | grep .
+      - name: Check for debugger statements
+        run: |
+          ! grep -rn "debugger" apps/ --include='*.ts' --include='*.tsx' --exclude-dir=node_modules .
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend Docker image
+        run: docker build -t iag-backend -f apps/backend/Dockerfile apps/backend
+      - name: Build frontend Docker image
+        run: docker build -t iag-frontend -f apps/frontend/Dockerfile apps/frontend
