@@ -1,6 +1,5 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { ServiceUnavailableException } from '@nestjs/common'
 import { PipelineController } from '../pipeline.controller'
 import { PipelineService } from '../pipeline.service'
 
@@ -20,15 +19,16 @@ describe('PipelineController', () => {
     assert.ok(Array.isArray(snapshots))
   })
 
-  it('should report unavailable input source without Neo4j', () => {
+  it('should report imported input source without Neo4j', () => {
     const controller = new PipelineController(new PipelineService())
-    assert.strictEqual(controller.getInputStatus().source, 'unavailable')
+    assert.strictEqual(controller.getInputStatus().source, 'imported')
   })
 
-  it('should reject start without Neo4j', async () => {
+  it('should run with imported graph when Neo4j is disabled', async () => {
     const service = new PipelineService()
     const controller = new PipelineController(service)
-    await assert.rejects(() => controller.start(), ServiceUnavailableException)
+    const result = await controller.start()
+    assert.strictEqual(result.status, 'COMPLETED')
   })
 
   it('should reset pipeline on POST /pipeline/reset', async () => {

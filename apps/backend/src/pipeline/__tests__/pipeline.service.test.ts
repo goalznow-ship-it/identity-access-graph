@@ -1,6 +1,5 @@
 import { describe, it, before } from 'node:test'
 import assert from 'node:assert'
-import { ServiceUnavailableException } from '@nestjs/common'
 import { PipelineService } from '../pipeline.service'
 import { PipelineStatus, PIPELINE_STAGES_ORDER } from '../../../../../packages/shared-types/src'
 
@@ -53,16 +52,16 @@ describe('PipelineService', () => {
     await assert.rejects(() => new PipelineService(undefined, graph as any).start(), /50,000-record pipeline snapshot limit/)
   })
 
-  it('should fail closed without Neo4j', async () => {
+  it('should use imported mode without Neo4j', async () => {
     const service = new PipelineService()
     assert.deepStrictEqual(service.getInputStatus(), {
-      ready: false,
-      source: 'unavailable',
-      productionSafe: false,
-      message: 'Neo4j must be enabled before pipeline runs can start.',
+      ready: true,
+      source: 'imported',
+      productionSafe: true,
+      message: 'Pipeline runs use the imported graph.',
     })
-    await assert.rejects(() => service.start(), /Neo4j is disabled/)
-    await assert.rejects(() => service.next(), /Neo4j is disabled/)
+    const result = await service.start()
+    assert.strictEqual(result.status, PipelineStatus.Completed)
   })
 
   it('should discard reset input and reload the latest authoritative graph', async () => {

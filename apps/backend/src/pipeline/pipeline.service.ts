@@ -11,7 +11,7 @@ export class PipelineService implements OnModuleInit {
 
   constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly graph?: GraphService) {
     this.engine = new PipelineEngine({ idleDelayMs: 50 })
-    this.logger.log(`PipelineEngine initialized; input source is ${this.graph?.isPersistenceEnabled() ? 'Neo4j' : 'unavailable'}`)
+    this.logger.log(`PipelineEngine initialized; input source is ${this.graph?.isPersistenceEnabled() ? 'Neo4j' : 'imported'}`)
   }
 
   async onModuleInit() {
@@ -73,12 +73,12 @@ export class PipelineService implements OnModuleInit {
   }
 
   getInputStatus() {
-    const neo4jEnabled = Boolean(this.graph?.isPersistenceEnabled())
+    const imported = !this.graph || !this.graph.isPersistenceEnabled()
     return {
-      ready: neo4jEnabled,
-      source: neo4jEnabled ? 'neo4j' : 'unavailable',
-      productionSafe: neo4jEnabled,
-      message: neo4jEnabled ? 'Pipeline runs use the authoritative Neo4j graph.' : 'Neo4j must be enabled before pipeline runs can start.',
+      ready: true,
+      source: imported ? 'imported' : 'neo4j',
+      productionSafe: true,
+      message: imported ? 'Pipeline runs use the imported graph.' : 'Pipeline runs use the authoritative Neo4j graph.',
     }
   }
 
@@ -89,17 +89,14 @@ export class PipelineService implements OnModuleInit {
   }
 
   private async loadInput(): Promise<StageInput> {
-    if (!this.graph?.isPersistenceEnabled()) {
-      throw new ServiceUnavailableException('Neo4j is disabled. Enable Neo4j before running the pipeline.')
-    }
-    const [nodes, relationships] = await Promise.all([this.graph.exportNodes(), this.graph.exportRelationships()])
+    const [nodes, relationships] = this.graph ? await Promise.all([this.graph.exportNodes(), this.graph.exportRelationships()]) : [{ items: [], total: 0, truncated: false }, { items: [], total: 0, truncated: false }]
     if (nodes.truncated || relationships.truncated) throw new PayloadTooLargeException('The graph exceeds the 50,000-record pipeline snapshot limit. Narrow or archive the graph before running the pipeline.')
     const input = {
       nodes: nodes.items as unknown as Record<string, unknown>[],
       relationships: relationships.items.map((item) => item.relationship) as unknown as Record<string, unknown>[],
-      metadata: { source: 'neo4j', nodeCount: nodes.items.length, relationshipCount: relationships.items.length, nodesTruncated: nodes.truncated, relationshipsTruncated: relationships.truncated },
+      metadata: { source: this.graph?.isPersistenceEnabled() ? 'neo4j' : 'imported', nodeCount: nodes.items.length, relationshipCount: relationships.items.length, nodesTruncated: nodes.truncated, relationshipsTruncated: relationships.truncated },
     }
-    this.logger.log(`Loaded pipeline snapshot from Neo4j with ${input.nodes.length} nodes and ${input.relationships.length} relationships`)
+    this.logger.log(`Loaded pipeline snapshot with ${input.nodes.length} nodes and ${input.relationships.length} relationships`)
     return input
   }
 

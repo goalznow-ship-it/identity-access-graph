@@ -1,1 +1,1 @@
-export * from './graph.module'; export * from './graph.service'; export * from './graph.controller'; export * from './enterprise-graph.service'; export * from './repositories'
+export * from './graph.module'; export * from './graph.service'; export * from './graph.controller'; export * from './enterprise-graph.service'; export * from './repositories'; export * from './graph-context.service'
