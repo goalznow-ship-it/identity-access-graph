@@ -27,7 +27,7 @@ export class FindingRepository implements OnModuleInit {
   get(id: string) { return this.findings.get(id) }
   list(filters: FindingFilters = {}) {
     const all = [...this.findings.values()].filter((f) => !filters.severity || f.severity === filters.severity).filter((f) => !filters.category || f.category === filters.category).filter((f) => !filters.status || f.status === filters.status).filter((f) => !filters.sourceSystem || f.sourceSystems.includes(filters.sourceSystem)).filter((f) => !filters.nodeId || f.affectedNodes.includes(filters.nodeId)).filter((f) => !filters.ruleId || f.ruleId === filters.ruleId).sort((a, b) => b.score - a.score)
-    const offset = Math.max(0, filters.offset ?? 0), limit = Math.min(500, Math.max(1, filters.limit ?? 100))
+    const offset = Math.max(0, filters.offset ?? 0), limit = Math.min(5000, Math.max(1, filters.limit ?? 100))
     return all.slice(offset, offset + limit)
   }
   setStatus(id: string, status: RiskFinding['status']) {

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { AuthUser, PlatformRole, TokenClaims } from './auth.types'
@@ -17,9 +17,11 @@ export class AuthService {
   private readonly ttlSeconds: number
   private readonly users: StoredUser[]
 
+  private readonly logger = new Logger(AuthService.name)
   constructor(config: ConfigService) {
     const nodeEnv = config.get<string>('NODE_ENV') ?? process.env.NODE_ENV ?? 'development'
     this.enabled = String(config.get('AUTH_ENABLED') ?? process.env.AUTH_ENABLED ?? (nodeEnv === 'production')).toLowerCase() === 'true'
+    if (!this.enabled && nodeEnv === 'production') this.logger.warn('Authentication is DISABLED in production mode. All API requests will be accepted as full ADMIN. Set AUTH_ENABLED=true and configure JWT_SECRET and users.')
     this.secret = config.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET ?? ''
     this.ttlSeconds = Number(config.get('AUTH_TOKEN_TTL_SECONDS') ?? process.env.AUTH_TOKEN_TTL_SECONDS ?? 28800)
     if (!Number.isInteger(this.ttlSeconds) || this.ttlSeconds < 300 || this.ttlSeconds > 86400) throw new BadRequestException('AUTH_TOKEN_TTL_SECONDS must be between 300 and 86400')
@@ -56,7 +58,7 @@ export class AuthService {
     if (!header || !payload || !signature || extra || !safeEqual(this.signature(`${header}.${payload}`), signature)) throw new UnauthorizedException('Invalid bearer token')
     try {
       const claims = JSON.parse(Buffer.from(payload, 'base64url').toString()) as TokenClaims
-      if (claims.iss !== 'identity-access-graph' || claims.exp <= Math.floor(Date.now() / 1000) || !Object.values(PlatformRole).includes(claims.role)) throw new Error('invalid claims')
+      if (claims.iss !== 'identity-access-graph' || claims.exp <= Math.floor(Date.now() / 1000) || !Object.values(PlatformRole).includes(claims.role)) throw new Error('Invalid or expired authentication claims')
       return claims
     } catch { throw new UnauthorizedException('Invalid or expired bearer token') }
   }

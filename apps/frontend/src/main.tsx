@@ -6,7 +6,8 @@ import './index.css'
 import { AuthProvider } from './auth/AuthContext'
 import { installAuthenticatedFetch } from './services/authApi'
 
-installAuthenticatedFetch()
+const cleanupFetch = installAuthenticatedFetch()
+if (import.meta.hot) import.meta.hot.dispose(cleanupFetch)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import { Client } from '@microsoft/microsoft-graph-client'
 import { ClientSecretCredential, DeviceCodeCredential, ClientCertificateCredential, type TokenCredential } from '@azure/identity'
 import type { Connector } from '../connector.types'
@@ -14,7 +15,7 @@ function getCredential(config: Connector['configuration']): TokenCredential {
       tenantId,
       clientId,
       userPromptCallback: (info) => {
-        console.log(`[Entra ID] Device code: ${info.message}`)
+        Logger.log(`Device code: ${info.message}`, 'EntraIDConnector')
       },
     })
   }

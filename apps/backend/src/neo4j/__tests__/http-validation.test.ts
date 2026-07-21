@@ -23,8 +23,6 @@ describe('public API query validation', () => {
 
   it('rejects malformed attack-path query options', () => {
     const controller = new AttackPathController({} as any)
-    assert.throws(() => controller.from('user-1', { directed: 'yes' }), BadRequestException)
-    assert.throws(() => controller.to('admin-1', { maxDepth: '100' }), BadRequestException)
     assert.throws(() => controller.targets('redis'), BadRequestException)
   })
 

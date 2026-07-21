@@ -22,7 +22,7 @@ export function useFileImport() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    getImportLimits().then(setLimits).catch(() => {})
+    getImportLimits().then(setLimits).catch(() => { if (typeof console !== 'undefined') console.warn('Failed to load import limits') })
   }, [])
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export function useFileImport() {
 
   const clearFiles = useCallback(() => {
     if (session && !session.cancelled) {
-      cancelImport(session.importId).catch(() => {})
+      cancelImport(session.importId).catch(() => { if (typeof console !== 'undefined') console.warn('Failed to cancel import') })
     }
     setPendingFiles([])
     setSession(null)

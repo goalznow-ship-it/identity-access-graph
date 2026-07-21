@@ -26,19 +26,25 @@ export function GraphMiniMap({ data, selected, onNavigate }: { data: GraphData; 
     ctx.roundRect(2, 2, 166, 104, 8)
     ctx.fill()
 
+    const linkCount = data.links.length
+    const nodeCount = data.nodes.length
+    const linkStep = Math.max(1, Math.ceil(linkCount / 3000))
+    const nodeStep = Math.max(1, Math.ceil(nodeCount / 2000))
     ctx.strokeStyle = 'rgba(71,85,105,0.25)'
     ctx.lineWidth = 0.5
-    data.links.slice(0, 3000).forEach((link: any) => {
+    for (let i = 0; i < linkCount; i += linkStep) {
+      const link = data.links[i]
       const s = typeof link.source === 'object' ? link.source : data.nodes.find(n => n.id === link.source)
       const t = typeof link.target === 'object' ? link.target : data.nodes.find(n => n.id === link.target)
-      if (!s || !t) return
+      if (!s || !t) continue
       const [a, bp] = [project(s), project(t)]
       ctx.beginPath()
       ctx.moveTo(...a)
       ctx.lineTo(...bp)
       ctx.stroke()
-    })
-    data.nodes.slice(0, 2000).forEach((node) => {
+    }
+    for (let i = 0; i < nodeCount; i += nodeStep) {
+      const node = data.nodes[i]
       const [x, y] = project(node)
       if (node.id === selected?.id) {
         ctx.fillStyle = '#ffffff'
@@ -56,7 +62,7 @@ export function GraphMiniMap({ data, selected, onNavigate }: { data: GraphData; 
         ctx.fill()
         ctx.globalAlpha = 1
       }
-    })
+    }
   }, [data, selected])
   return (
     <canvas

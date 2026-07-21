@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { NotificationsService } from '../notifications'
 import { FindingRepository } from './finding.repository'
 import { RiskGraphSourceService } from './risk-graph-source.service'
 import { RiskScoringService } from './risk-scoring.service'
 import { riskRules } from './rules'
-import { FindingStatus, type FindingFilters, type RiskFinding, type RiskScanRequest, type RiskScanRun } from './risk.types'
+import { FindingSeverity, FindingStatus, type FindingFilters, type RiskFinding, type RiskScanRequest, type RiskScanRun } from './risk.types'
 
 export function stableFindingId(ruleId: string, nodes: string[], relationships: string[] = []) {
   return `finding-${createHash('sha256').update([ruleId, ...[...nodes].sort(), ...[...relationships].sort()].join('|')).digest('hex').slice(0, 20)}`
@@ -13,6 +13,7 @@ export function stableFindingId(ruleId: string, nodes: string[], relationships: 
 
 @Injectable()
 export class RiskService {
+  private readonly logger = new Logger(RiskService.name)
   private scanning = false
   constructor(private source: RiskGraphSourceService, private findings: FindingRepository, private scoring: RiskScoringService, @Optional() private notifications?: NotificationsService) {}
   rules() { return riskRules.map(({ detect: _detect, ...rule }) => rule) }
@@ -46,14 +47,14 @@ export class RiskService {
       Object.assign(run, { status: 'COMPLETED', rulesRun: selected.length, findingsDetected: detectedIds.size, findingsResolved: resolved, durationMs, completedAt: new Date().toISOString() })
       this.findings.saveScan(run)
       await this.findings.flush()
-      const critical = this.findings.list({ severity: 'CRITICAL' as any, status: FindingStatus.OPEN, limit: 500 }).length
-      await this.notifications?.create({ type: 'RISK_SCAN', severity: critical ? 'CRITICAL' : detectedIds.size ? 'HIGH' : 'INFO', title: critical ? `${critical} critical risk finding${critical === 1 ? '' : 's'} detected` : 'Risk scan completed', message: `${detectedIds.size} findings detected and ${resolved} resolved across ${selected.length} rules.`, link: '/risk', metadata: { scanId: run.id, findingsDetected: detectedIds.size, findingsResolved: resolved } }).catch(() => undefined)
-      return { scanId: run.id, rulesRun: run.rulesRun, findingsDetected: run.findingsDetected, findingsResolved: resolved, totalFindings: this.findings.list({ limit: 500 }).length, durationMs, graphSource }
+      const critical = this.findings.list({ severity: FindingSeverity.CRITICAL, status: FindingStatus.OPEN, limit: 5000 }).length
+      await this.notifications?.create({ type: 'RISK_SCAN', severity: critical ? 'CRITICAL' : detectedIds.size ? 'HIGH' : 'INFO', title: critical ? `${critical} critical risk finding${critical === 1 ? '' : 's'} detected` : 'Risk scan completed', message: `${detectedIds.size} findings detected and ${resolved} resolved across ${selected.length} rules.`, link: '/risk', metadata: { scanId: run.id, findingsDetected: detectedIds.size, findingsResolved: resolved } }).catch((err) => this.logger.warn('Risk scan notification failed', err))
+      return { scanId: run.id, rulesRun: run.rulesRun, findingsDetected: run.findingsDetected, findingsResolved: resolved, totalFindings: this.findings.list({ limit: 5000 }).length, durationMs, graphSource }
     } catch (error) {
       Object.assign(run, { status: 'FAILED', rulesRun: selected.length, durationMs: Date.now() - started, error: (error as Error).message, completedAt: new Date().toISOString() })
       this.findings.saveScan(run)
       await this.findings.flush()
-      await this.notifications?.create({ type: 'RISK_SCAN', severity: 'HIGH', title: 'Risk scan failed', message: (error as Error).message, link: '/risk', metadata: { scanId: run.id } }).catch(() => undefined)
+      await this.notifications?.create({ type: 'RISK_SCAN', severity: 'HIGH', title: 'Risk scan failed', message: (error as Error).message, link: '/risk', metadata: { scanId: run.id } }).catch((err) => this.logger.warn('Risk scan failure notification failed', err))
       throw error
     } finally {
       this.scanning = false
@@ -66,7 +67,7 @@ export class RiskService {
   scans(limit?: number) { return this.findings.scansList(limit) }
   scanRun(id: string) { const run = this.findings.scanById(id); if (!run) throw new NotFoundException('Risk scan not found'); return run }
   summary() {
-    const all = this.findings.list({ limit: 500 }), open = all.filter((finding) => finding.status === FindingStatus.OPEN)
+    const all = this.findings.list({ limit: 5000 }), open = all.filter((finding) => finding.status === FindingStatus.OPEN)
     const count = (key: 'severity' | 'category') => all.reduce<Record<string, number>>((out, finding) => { out[finding[key]] = (out[finding[key]] ?? 0) + 1; return out }, {})
     const nodeScores = new Map<string, number>()
     all.forEach((finding) => finding.affectedNodes.forEach((id) => nodeScores.set(id, (nodeScores.get(id) ?? 0) + finding.score)))

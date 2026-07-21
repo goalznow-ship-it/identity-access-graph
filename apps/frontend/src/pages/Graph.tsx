@@ -115,7 +115,7 @@ export function GraphPage() {
   useEffect(() => {
     const nodeId = searchParams.get('nodeId'); if (!nodeId || !data) return
     const node = data.nodes.find((candidate) => candidate.id === nodeId); if (node) { selectNode(node); window.setTimeout(() => fgRef.current?.center(node), 120); return }
-    if (source === 'neo4j') void getNeo4jNode(nodeId).then((raw) => { const remoteNode = adaptNeo4jNode(raw); selectNode(remoteNode); return expandRemote(nodeId, 'both', 1) }).catch(() => undefined)
+    if (source === 'neo4j') void getNeo4jNode(nodeId).then((raw) => { const remoteNode = adaptNeo4jNode(raw); selectNode(remoteNode); return expandRemote(nodeId, 'both', 1) }).catch(() => setFallbackNotice('Could not load all node details'))
   }, [data, searchParams, selectNode, source, expandRemote])
   useEffect(()=>{const pathId=searchParams.get('pathId');if(!pathId){setExternalPath(null);return}void getAttackPath(pathId).then(path=>{setExternalPath(path);setInvestigationOpen(true);window.setTimeout(()=>fgRef.current?.fit(),100)}).catch(()=>setFallbackNotice('Attack path could not be loaded.'))},[searchParams])
 
@@ -155,7 +155,7 @@ export function GraphPage() {
     (node: any) => {
       selectNode(node)
       fgRef.current?.center(node)
-      if (source === 'neo4j') void getNeo4jNode(node.id).then((full) => selectNode(adaptNeo4jNode(full))).catch(() => undefined)
+      if (source === 'neo4j') void getNeo4jNode(node.id).then((full) => selectNode(adaptNeo4jNode(full))).catch(() => setFallbackNotice('Could not load full node details'))
     },
     [selectNode, source],
   )
