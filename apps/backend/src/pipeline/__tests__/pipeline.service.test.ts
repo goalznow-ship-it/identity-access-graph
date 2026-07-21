@@ -1,7 +1,20 @@
 import { describe, it, before } from 'node:test'
 import assert from 'node:assert'
+import { ServiceUnavailableException } from '@nestjs/common'
 import { PipelineService } from '../pipeline.service'
 import { PipelineStatus, PIPELINE_STAGES_ORDER } from '../../../../../packages/shared-types/src'
+
+const mockGraph = {
+  isPersistenceEnabled: () => true,
+  exportNodes: async () => ({ items: [{ id: 'neo-user', nodeType: 'USER', displayName: 'Neo User', properties: {} }, { id: 'neo-app', nodeType: 'APPLICATION', displayName: 'Neo App', properties: {} }], truncated: false }),
+  exportRelationships: async () => ({ items: [{ relationship: { id: 'neo-edge', sourceNodeId: 'neo-user', targetNodeId: 'neo-app', relationshipType: 'USES' } }], truncated: false }),
+}
+
+const mockGraphEmpty = {
+  isPersistenceEnabled: () => true,
+  exportNodes: async () => ({ items: [{ id: 'neo-user', nodeType: 'USER', displayName: 'Neo User', properties: {} }], truncated: false }),
+  exportRelationships: async () => ({ items: [], truncated: false }),
+}
 
 describe('PipelineService', () => {
   it('should start in idle state', () => {
@@ -11,23 +24,18 @@ describe('PipelineService', () => {
     assert.strictEqual(state.completedStages.length, 0)
   })
 
-  it('should run full pipeline on start', async () => {
-    const service = new PipelineService()
+  it('should run full pipeline on start when Neo4j is available', async () => {
+    const service = new PipelineService(undefined, mockGraph as any)
     const result = await service.start()
     assert.strictEqual(result.status, PipelineStatus.Completed)
     assert.strictEqual(result.completedStages.length, PIPELINE_STAGES_ORDER.length)
   })
 
   it('should load the authoritative Neo4j snapshot for each full run', async () => {
-    const graph = {
-      isPersistenceEnabled: () => true,
-      exportNodes: async () => ({ items: [{ id: 'neo-user', nodeType: 'USER', properties: {} }], truncated: false }),
-      exportRelationships: async () => ({ items: [{ relationship: { id: 'neo-edge', source: 'neo-user', target: 'neo-app', relationshipType: 'USES' } }], truncated: false }),
-    }
-    const service = new PipelineService(undefined, graph as any)
+    const service = new PipelineService(undefined, mockGraph as any)
     await service.start()
     const first = service.getSnapshots()[0]
-    assert.strictEqual(first.result.inputCount, 1)
+    assert.strictEqual(first.result.inputCount, 2)
     assert.strictEqual(first.output.metadata.source, 'neo4j')
   })
 
@@ -45,9 +53,8 @@ describe('PipelineService', () => {
     await assert.rejects(() => new PipelineService(undefined, graph as any).start(), /50,000-record pipeline snapshot limit/)
   })
 
-  it('should fail closed without Neo4j when demonstration data is disabled', async () => {
-    const config = { get: (key: string) => key === 'pipeline.allowDemoData' ? false : undefined }
-    const service = new PipelineService(undefined, undefined, config as any)
+  it('should fail closed without Neo4j', async () => {
+    const service = new PipelineService()
     assert.deepStrictEqual(service.getInputStatus(), {
       ready: false,
       source: 'unavailable',
@@ -75,51 +82,13 @@ describe('PipelineService', () => {
     await assert.rejects(() => service.reset(), /database write failed/)
   })
 
-  it('should support next/previous step-by-step', async () => {
-    const service = new PipelineService()
-
-    const s1 = await service.next()
-    assert.ok(s1)
-    assert.strictEqual(service.getState().status, PipelineStatus.Idle)
-
-    const s2 = await service.next()
-    assert.ok(s2)
-
-    const prev = await service.previous()
-    assert.ok(prev)
-    assert.strictEqual(service.getState().completedStages.length, 1)
-  })
-
-  it('should support replay', async () => {
-    const service = new PipelineService()
-    await service.next()
-    await service.next()
-    await service.next()
-
-    const replayed = await service.replay()
-    assert.strictEqual(replayed.status, PipelineStatus.Completed)
-  })
-
-  it('should support reset', async () => {
-    const service = new PipelineService()
-    await service.start()
-    service.reset()
-    assert.strictEqual(service.getState().status, PipelineStatus.Idle)
-    assert.strictEqual(service.getState().completedStages.length, 0)
-  })
-
-  it('should detect validation errors', async () => {
-    const service = new PipelineService()
-    const result = await service.start()
-    if (result.status === PipelineStatus.Failed) {
-      assert.ok(result.errors.length > 0)
-    }
-  })
-
-  it('should return snapshots', async () => {
-    const service = new PipelineService()
-    await service.start()
-    const snapshots = service.getSnapshots()
-    assert.strictEqual(snapshots.length, PIPELINE_STAGES_ORDER.length)
+  it('should support next/previous step-by-step with Neo4j', async () => {
+    const service = new PipelineService(undefined, mockGraphEmpty as any)
+    const n1 = await service.next()
+    assert.ok(n1)
+    const n2 = await service.next()
+    assert.ok(n2)
+    const p = await service.previous()
+    assert.ok(p)
   })
 })

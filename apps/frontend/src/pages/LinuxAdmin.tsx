@@ -98,7 +98,7 @@ export function LinuxAdminPage() {
         <div className="flex w-80 shrink-0 flex-col border-r border-border p-4">
           <div className="mb-4">
             <h1 className="text-base font-semibold text-gray-100">Linux Admin</h1>
-            <p className="text-xs text-gray-500">Select a host from {source === 'neo4j' ? 'Neo4j Live' : source === 'imported' ? 'the active import' : 'the demonstration graph'}</p>
+            <p className="text-xs text-gray-500">Select a host from {source === 'neo4j' ? 'Neo4j Live' : 'the active import'}</p>
           </div>
           <LinuxHostList
             hosts={hosts}

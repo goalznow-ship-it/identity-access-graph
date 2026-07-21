@@ -1,5 +1,5 @@
 import type { GraphData, GraphNode, GraphLink } from './graph'
-export type GraphSourceMode = 'mock'|'imported'|'neo4j'
+export type GraphSourceMode = 'imported'|'neo4j'
 export type Neo4jHealthState = 'connected'|'disabled'|'unreachable'|'degraded'|'checking'
 export interface Neo4jHealth { status: 'ok'|'error'|'disabled'; connectivity: boolean; database: string; serverAgent?: string; latencyMs: number; timestamp: string }
 export interface BackendGraphNode { id: string; displayName?: string; nodeType?: string; sourceSystem?: string; sourceId?: string; riskLevel?: string; status?: string; properties?: Record<string, unknown>; [key: string]: unknown }

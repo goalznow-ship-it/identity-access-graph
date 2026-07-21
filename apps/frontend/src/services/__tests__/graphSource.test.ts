@@ -6,7 +6,7 @@ describe('graph source helpers', () => {
   it('validates allowed source modes', () => {
     assert.equal(allowedGraphSource('neo4j'), 'neo4j')
     assert.equal(allowedGraphSource('imported'), 'imported')
-    assert.equal(allowedGraphSource('mock'), 'neo4j')
+    assert.equal(allowedGraphSource('mock' as any), 'neo4j')
     assert.equal(allowedGraphSource('unknown'), 'neo4j')
     assert.equal(allowedGraphSource(null), 'neo4j')
     assert.equal(allowedGraphSource(undefined), 'neo4j')

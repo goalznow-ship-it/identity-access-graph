@@ -157,7 +157,7 @@ export function BusinessQuestionsPage() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-100">Business Questions Engine</h1>
-          <p className="text-sm text-gray-500">Answer enterprise IAM questions against {source === 'neo4j' ? 'Neo4j Live' : source === 'imported' ? 'the active import' : 'the explicitly selected demonstration graph'}.</p>
+          <p className="text-sm text-gray-500">Answer enterprise IAM questions against {source === 'neo4j' ? 'Neo4j Live' : 'the active import'}.</p>
         </div>
         {result && (
           <div className="flex gap-2">

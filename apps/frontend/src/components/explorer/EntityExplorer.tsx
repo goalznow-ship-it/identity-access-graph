@@ -11,7 +11,7 @@ type SortDirection = 'ASC' | 'DESC'
 
 export function EntityExplorer({ title, subtitle, nodeTypes }: { title: string; subtitle: string; nodeTypes: string[] }) {
   const { source } = useGraphSource()
-  const local = useGraphData(undefined, source === 'neo4j' ? 'mock' : source)
+  const local = useGraphData(undefined, source)
   const navigate = useNavigate()
   const [items, setItems] = useState<GraphNode[]>([])
   const [total, setTotal] = useState(0)

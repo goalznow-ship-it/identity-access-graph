@@ -1,31 +1,17 @@
 import { Injectable, Logger, OnModuleInit, Optional, PayloadTooLargeException, ServiceUnavailableException } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { PipelineEngine, type StageInput } from './pipeline-engine'
-import { allNodesFlat, relationships } from '../../../../packages/mock-data/src'
 import { OperationalStoreService } from '../database/operational-store.service'
 import { GraphService } from '../graph'
-
-function buildDefaultInput(): StageInput {
-  return {
-    nodes: allNodesFlat as unknown as Record<string, unknown>[],
-    relationships: relationships as unknown as Record<string, unknown>[],
-    metadata: { source: 'mock-data', nodeCount: allNodesFlat.length, relationshipCount: relationships.length },
-  }
-}
 
 @Injectable()
 export class PipelineService implements OnModuleInit {
   private readonly logger = new Logger(PipelineService.name)
   private readonly engine: PipelineEngine
-  private readonly defaultInput: StageInput
-  private readonly allowDemoData: boolean
   private inputReady = false
 
-  constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly graph?: GraphService, @Optional() config?: ConfigService) {
+  constructor(@Optional() private readonly store?: OperationalStoreService, @Optional() private readonly graph?: GraphService) {
     this.engine = new PipelineEngine({ idleDelayMs: 50 })
-    this.defaultInput = buildDefaultInput()
-    this.allowDemoData = config?.get<boolean>('pipeline.allowDemoData') ?? process.env.NODE_ENV !== 'production'
-    this.logger.log(`PipelineEngine initialized; input source is ${this.graph?.isPersistenceEnabled() ? 'Neo4j' : this.allowDemoData ? 'development demo data' : 'unavailable'}`)
+    this.logger.log(`PipelineEngine initialized; input source is ${this.graph?.isPersistenceEnabled() ? 'Neo4j' : 'unavailable'}`)
   }
 
   async onModuleInit() {
@@ -89,10 +75,10 @@ export class PipelineService implements OnModuleInit {
   getInputStatus() {
     const neo4jEnabled = Boolean(this.graph?.isPersistenceEnabled())
     return {
-      ready: neo4jEnabled || this.allowDemoData,
-      source: neo4jEnabled ? 'neo4j' : this.allowDemoData ? 'demo' : 'unavailable',
+      ready: neo4jEnabled,
+      source: neo4jEnabled ? 'neo4j' : 'unavailable',
       productionSafe: neo4jEnabled,
-      message: neo4jEnabled ? 'Pipeline runs use the authoritative Neo4j graph.' : this.allowDemoData ? 'Pipeline runs use development demonstration data.' : 'Neo4j must be enabled before pipeline runs can start.',
+      message: neo4jEnabled ? 'Pipeline runs use the authoritative Neo4j graph.' : 'Neo4j must be enabled before pipeline runs can start.',
     }
   }
 
@@ -104,8 +90,7 @@ export class PipelineService implements OnModuleInit {
 
   private async loadInput(): Promise<StageInput> {
     if (!this.graph?.isPersistenceEnabled()) {
-      if (this.allowDemoData) return this.defaultInput
-      throw new ServiceUnavailableException('Neo4j is disabled and PIPELINE_ALLOW_DEMO_DATA is false. Enable Neo4j before running the pipeline.')
+      throw new ServiceUnavailableException('Neo4j is disabled. Enable Neo4j before running the pipeline.')
     }
     const [nodes, relationships] = await Promise.all([this.graph.exportNodes(), this.graph.exportRelationships()])
     if (nodes.truncated || relationships.truncated) throw new PayloadTooLargeException('The graph exceeds the 50,000-record pipeline snapshot limit. Narrow or archive the graph before running the pipeline.')

@@ -1,5 +1,4 @@
-import data from './mockGraphData.json'
-import type { GraphNode, GraphData } from '../types/graph'
+import type { GraphNode } from '../types/graph'
 
 export const NODE_TYPE_COLORS: Record<string, string> = {
   USER: '#3b82f6',
@@ -27,10 +26,6 @@ export const NODE_TYPE_COLORS: Record<string, string> = {
   LINUX_GROUP: '#14b8a6',
   SUDO_POLICY: '#14b8a6',
   SSH_KEY: '#14b8a6',
-}
-
-export function buildGraphData(): GraphData {
-  return data as GraphData
 }
 
 export function getNodeColor(node: GraphNode): string {

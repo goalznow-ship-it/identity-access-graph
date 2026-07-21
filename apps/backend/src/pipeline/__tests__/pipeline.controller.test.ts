@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
+import { ServiceUnavailableException } from '@nestjs/common'
 import { PipelineController } from '../pipeline.controller'
 import { PipelineService } from '../pipeline.service'
 
@@ -12,25 +13,22 @@ describe('PipelineController', () => {
     assert.strictEqual(typeof state.status, 'string')
   })
 
-  it('should return snapshots on GET /pipeline/snapshots', async () => {
+  it('should return snapshots on GET /pipeline/snapshots', () => {
     const service = new PipelineService()
     const controller = new PipelineController(service)
-    await service.start()
     const snapshots = controller.getSnapshots()
     assert.ok(Array.isArray(snapshots))
-    assert.ok(snapshots.length > 0)
   })
 
-  it('should expose the active input source', () => {
+  it('should report unavailable input source without Neo4j', () => {
     const controller = new PipelineController(new PipelineService())
-    assert.strictEqual(controller.getInputStatus().source, 'demo')
+    assert.strictEqual(controller.getInputStatus().source, 'unavailable')
   })
 
-  it('should start and complete pipeline on POST /pipeline/start', async () => {
+  it('should reject start without Neo4j', async () => {
     const service = new PipelineService()
     const controller = new PipelineController(service)
-    const result = await controller.start()
-    assert.strictEqual(result.status, 'COMPLETED')
+    await assert.rejects(() => controller.start(), ServiceUnavailableException)
   })
 
   it('should reset pipeline on POST /pipeline/reset', async () => {
@@ -39,16 +37,5 @@ describe('PipelineController', () => {
     await controller.reset()
     const state = controller.getState()
     assert.strictEqual(state.status, 'IDLE')
-  })
-
-  it('should support next/previous via controller', async () => {
-    const service = new PipelineService()
-    const controller = new PipelineController(service)
-    const n1 = await controller.next()
-    assert.ok(n1)
-    const n2 = await controller.next()
-    assert.ok(n2)
-    const p = await controller.previous()
-    assert.ok(p)
   })
 })

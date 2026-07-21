@@ -40,7 +40,6 @@ import { getActiveImportSession } from '../services/importApi'
 import { clusterGraph, filterGraphView, loadLayout, saveLayout, type GraphClusterMode, type GraphViewMode, type SavedGraphView } from '../services/graphPresentation'
 import { getAttackPath } from '../services/attackPathApi'
 import type { AttackPath } from '../types/attackPath'
-import { DEMO_DATA_ENABLED } from '../services/runtimeConfig'
 
 export function GraphPage() {
   const [searchParams] = useSearchParams()
@@ -200,7 +199,7 @@ export function GraphPage() {
   }, [clearSelection, investigation.back, investigation.forward])
 
   useEffect(()=>{let cancelled=false;if(importedId){setImportedAvailable(true);return()=>{cancelled=true}}void getActiveImportSession().then((session)=>{if(cancelled)return;setImportedAvailable(true);localStorage.setItem('lastImportId',session.importId)}).catch(()=>{if(!cancelled)setImportedAvailable(false)});return()=>{cancelled=true}},[importedId,source])
-  useEffect(() => { if (!DEMO_DATA_ENABLED || source !== 'neo4j' || !error || typeof localStorage === 'undefined') return; if (loadSettings(localStorage).autoFallback) { if (importedAvailable) { setFallbackNotice(`Neo4j Live unavailable: ${error}. Switched to imported session.`); setSource('imported') } else { setFallbackNotice(`Neo4j Live unavailable: ${error}. Switched to Mock Enterprise.`); setSource('mock') } } }, [source, error, setSource, importedAvailable])
+  useEffect(() => { if (source !== 'neo4j' || !error || typeof localStorage === 'undefined') return; if (loadSettings(localStorage).autoFallback && importedAvailable) { setFallbackNotice(`Neo4j Live unavailable: ${error}. Switched to imported session.`); setSource('imported') } }, [source, error, setSource, importedAvailable])
   useEffect(()=>{if(typeof localStorage==='undefined')return;const next=loadLayout(localStorage,source);setLayout(next);window.setTimeout(()=>fgRef.current?.setLayout(next),0)},[source])
 
   const loadSavedView=(view:SavedGraphView)=>{setSource(view.source);setViewMode(view.viewMode);setClusterMode(view.clustering);setLayout(view.layout);setSystemFilter(view.filters.systems);setNodeTypeFilter(view.filters.nodeTypes);setRelationshipTypeFilter(view.filters.relationshipTypes);setRiskLevelFilter(view.filters.riskLevels);setStatusFilter(view.filters.statuses);setAccessFilter(view.filters.accessTypes);window.setTimeout(()=>fgRef.current?.setLayout(view.layout),0)}
@@ -217,7 +216,7 @@ export function GraphPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="p-6 text-center">
-          <p className="text-danger">Failed to load graph data</p><p className="mt-2 max-w-md text-xs text-gray-500">{error}</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button onClick={()=>void retry()} className="rounded bg-primary px-3 py-1.5 text-xs">Retry</button>{source==='imported'&&<button onClick={()=>navigate('/imports')} className="rounded border border-border px-3 py-1.5 text-xs">Open Imports</button>}{DEMO_DATA_ENABLED&&<button onClick={()=>setSource('mock')} className="rounded border border-border px-3 py-1.5 text-xs">Use Mock Enterprise</button>}</div>
+          <p className="text-danger">Failed to load graph data</p><p className="mt-2 max-w-md text-xs text-gray-500">{error}</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button onClick={()=>void retry()} className="rounded bg-primary px-3 py-1.5 text-xs">Retry</button>{source==='imported'&&<button onClick={()=>navigate('/imports')} className="rounded border border-border px-3 py-1.5 text-xs">Open Imports</button>}</div>
         </Card>
       </div>
     )
@@ -257,7 +256,6 @@ export function GraphPage() {
             <label className="block text-[10px] font-semibold uppercase tracking-widest text-gray-500">Graph source</label>
             <div className="relative">
               <select value={source} onChange={(event) => handleSourceChange(event.target.value as GraphSourceMode)} className="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-gray-200 transition hover:border-gray-600">
-                {DEMO_DATA_ENABLED&&<option value="mock">Mock Enterprise</option>}
                 <option value="imported">Imported Session</option>
                 <option value="neo4j">Neo4j Live</option>
               </select>
@@ -360,7 +358,7 @@ export function GraphPage() {
                     ) : (
                       <>
                         <button onClick={() => navigate('/imports')} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-hover">Import relationship data</button>
-                        {DEMO_DATA_ENABLED&&<button onClick={() => setSource('mock')} className="rounded-lg border border-border px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5">Try demo graph</button>}
+                        
                       </>
                     )}
                   </div>

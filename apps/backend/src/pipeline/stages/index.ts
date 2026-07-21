@@ -41,7 +41,7 @@ export async function extractionStage(input: StageInput): Promise<StageResult & 
     durationMs: Date.now() - start,
     warnings,
     errors,
-    metadata: { extractedAt: now(), source: input.metadata.source ?? 'mock', nodeTypes: [...new Set(nodes.map((n) => (n as any).nodeType))] },
+    metadata: { extractedAt: now(), source: input.metadata.source ?? 'import', nodeTypes: [...new Set(nodes.map((n) => (n as any).nodeType))] },
     output: { nodes, relationships, metadata: { ...input.metadata, extractedAt: now() } },
   }
 }
