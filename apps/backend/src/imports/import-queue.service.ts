@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { DataSource, LessThanOrEqual, Repository } from 'typeorm'
 import { ImportAuditLogEntity, ImportJobEntity } from '../database/entities'
 import { IMPORT_CONFIG } from './import-config'
+import { structuredImportError } from './import-source-file'
 
 @Injectable()
 export class ImportQueueService {
@@ -22,7 +23,7 @@ export class ImportQueueService {
   async claim(workerId: string): Promise<ImportJobEntity | null> {
     return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(ImportJobEntity)
-      const expired = new Date(Date.now() - IMPORT_CONFIG.workerLeaseMs)
+      const expired = new Date(Date.now() - Math.max(IMPORT_CONFIG.workerLeaseMs, IMPORT_CONFIG.staleJobTimeoutMs))
       const job = await repository.createQueryBuilder('job')
         .setLock('pessimistic_write').setOnLocked('skip_locked')
         .where('(job.status IN (:...available) AND job.next_attempt_at <= now()) OR (job.status = :processing AND job.locked_at < :expired)', { available: ['QUEUED', 'RETRY'], processing: 'PROCESSING', expired })
@@ -49,6 +50,18 @@ export class ImportQueueService {
     const delay = IMPORT_CONFIG.retryBaseDelayMs * 2 ** Math.max(0, job.attempts - 1)
     await this.jobs.update(job.id, { status: retry ? 'RETRY' : 'FAILED', error: error.message, lockedAt: null, lockedBy: null, nextAttemptAt: new Date(Date.now() + delay), completedAt: retry ? null : new Date() })
     await this.record(job.importId, retry ? 'JOB_RETRY_SCHEDULED' : 'JOB_FAILED', { jobId: job.id, fileId: job.fileId, attempts: job.attempts, error: error.message, delayMs: retry ? delay : 0 })
+  }
+
+  async failPermanent(job: ImportJobEntity, error: unknown, event = 'JOB_FAILED') {
+    const detail = structuredImportError(error)
+    await this.jobs.update(job.id, { status: 'FAILED', error: JSON.stringify(detail), lockedAt: null, lockedBy: null, completedAt: new Date() })
+    await this.record(job.importId, event, { jobId: job.id, fileId: job.fileId, ...detail })
+  }
+
+  async requeueRecovered(job: ImportJobEntity) {
+    if (!['QUEUED', 'RETRY', 'PROCESSING'].includes(job.status)) return
+    await this.jobs.update(job.id, { status: 'QUEUED', lockedAt: null, lockedBy: null, nextAttemptAt: new Date(), completedAt: null })
+    await this.record(job.importId, 'JOB_RECOVERED', { jobId: job.id, fileId: job.fileId })
   }
 
   async cancel(importId: string) {

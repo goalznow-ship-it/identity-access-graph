@@ -17,6 +17,7 @@ import type { ImportJobEntity } from '../database/entities'
 import { ImportQueueService } from './import-queue.service'
 import { ImportChunkService } from './import-chunk.service'
 import { parseCsvChunked, parseExcelChunked } from './parsers/chunked-parser'
+import { ImportSourceError, requireReadableImportSource, safeImportSourceName, SOURCE_FILE_MISSING, SOURCE_FILE_UNAVAILABLE_MESSAGE, structuredImportError } from './import-source-file'
 
 const UPLOAD_DIR = IMPORT_CONFIG.uploadDir
 const STATE_DIR = path.join(UPLOAD_DIR, '.state')
@@ -69,9 +70,25 @@ export class ImportsService implements OnModuleInit {
   private async recoverStaleSessions(): Promise<void> {
     if (!this.queue) return
     for (const [importId, session] of this.sessions) {
-      if (session.progress?.status !== 'parsing' && session.progress?.status !== 'uploading') continue
+      if (!['parsing', 'uploading'].includes(session.progress?.status ?? '')) continue
       const jobs = await this.queue.jobsFor(importId)
-      if (jobs.length === 0) continue
+      if (jobs.length === 0) {
+        if (session.files.every((file) => file.status === 'error')) this.markFailed(importId, session.files[0]?.error ?? 'Import failed.')
+        continue
+      }
+      for (const job of jobs.filter((item) => ['QUEUED', 'RETRY', 'PROCESSING'].includes(item.status))) {
+        const file = session.files.find((item) => item.id === job.fileId)
+        try {
+          if (!file?.filePath) throw new ImportSourceError(SOURCE_FILE_MISSING, SOURCE_FILE_UNAVAILABLE_MESSAGE)
+          file.filePath = await requireReadableImportSource(file.filePath)
+          await this.queue.requeueRecovered(job)
+        } catch (error) {
+          const detail = structuredImportError(error)
+          this.logger.error(`Import recovery failed import=${importId} job=${job.id} file=${safeImportSourceName(file?.filePath ?? file?.sanitizedName ?? job.fileId)} code=${detail.code}`)
+          await this.queue.failPermanent(job, error, 'IMPORT_RECOVERY_FAILED')
+          this.markFileFailed(importId, job.fileId, detail.message, detail.code)
+        }
+      }
       const allTerminal = jobs.every((j) => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(j.status))
       if (allTerminal && jobs.some((j) => j.status === 'FAILED')) {
         const lastError = jobs.filter((j) => j.status === 'FAILED').pop()?.error ?? 'Unknown error'
@@ -231,7 +248,7 @@ export class ImportsService implements OnModuleInit {
 
   getLatestSession(): ImportSession | undefined {
     return [...this.sessions.values()]
-      .filter((session) => !session.cancelled && !this.cancelledSessions.has(session.importId))
+      .filter((session) => !session.cancelled && !this.cancelledSessions.has(session.importId) && !['failed', 'cancelled'].includes(session.progress?.status ?? ''))
       .sort((a, b) => b.createdAt - a.createdAt)[0]
   }
 
@@ -251,24 +268,27 @@ export class ImportsService implements OnModuleInit {
     this.cancelledSessions.add(importId)
     void this.queue?.cancel(importId)
     this.updateProgress(importId, { status: 'cancelled' })
-    this.cleanupSessionFiles(importId)
+    this.scheduleCleanup(importId, IMPORT_CONFIG.fileRetentionMs)
     return true
   }
 
-  markFileFailed(importId: string, fileId: string, error: string): void {
+  markFileFailed(importId: string, fileId: string, error: string, errorCode = 'IMPORT_PROCESSING_FAILED'): void {
     const session = this.sessions.get(importId)
     if (!session) return
     const file = session.files.find((item) => item.id === fileId)
-    if (file) { file.status = 'error'; file.error = error }
-    this.markFailed(importId, error)
+    if (file) { file.status = 'error'; file.error = error; file.errorCode = errorCode }
+    this.markFailed(importId, error, errorCode)
   }
 
-  private markFailed(importId: string, error: string): void {
+  private markFailed(importId: string, error: string, errorCode = 'IMPORT_PROCESSING_FAILED'): void {
     const session = this.sessions.get(importId)
     if (!session) return
     const elapsedMs = Date.now() - session.createdAt
+    session.error = { code: errorCode, message: error }
     session.progress = { ...session.progress!, status: 'failed', filesCompleted: session.files.filter((f) => f.status === 'inspected').length, filesFailed: session.files.filter((f) => f.status === 'error').length, elapsedMs }
     this.persistSnapshot(importId)
+    void this.store?.flush().catch((failure: Error) => this.logger.error(`Could not persist failed import ${importId}: ${failure.message}`))
+    this.scheduleCleanup(importId, IMPORT_CONFIG.fileRetentionMs)
   }
 
   async retryFile(importId: string, fileId: string, inline = false): Promise<ImportSession | null> {
@@ -279,7 +299,14 @@ export class ImportsService implements OnModuleInit {
     if (fileIndex === -1 || session.files[fileIndex].status !== 'error') return null
 
     const file = session.files[fileIndex]
-    if (!file.filePath || !fs.existsSync(file.filePath)) return null
+    if (!file.filePath) return null
+    try {
+      file.filePath = await requireReadableImportSource(file.filePath)
+    } catch (error) {
+      const detail = structuredImportError(error)
+      this.markFileFailed(importId, fileId, detail.message, detail.code)
+      return null
+    }
 
     if (this.queue && !inline) {
       file.status = 'uploaded'; file.error = undefined; this.persistSnapshot(importId)
@@ -337,6 +364,8 @@ export class ImportsService implements OnModuleInit {
     const file = session?.files.find((item) => item.id === job.fileId)
     if (!session || !file) throw new Error('Import session or file is no longer available.')
     if (session.cancelled || this.cancelledSessions.has(job.importId)) throw new Error('Import was cancelled.')
+    if (!file.filePath) throw new ImportSourceError(SOURCE_FILE_MISSING, SOURCE_FILE_UNAVAILABLE_MESSAGE)
+    file.filePath = await requireReadableImportSource(file.filePath)
     await saveCheckpoint({ phase: 'parsing', fileId: file.id, rowsProcessed: file.progress?.rowsProcessed ?? 0 })
     const ext = path.extname(file.originalName).toLowerCase()
     if (this.chunks && file.filePath && ['.csv', '.xlsx', '.xls'].includes(ext)) {
@@ -376,6 +405,7 @@ export class ImportsService implements OnModuleInit {
     const processed = session.files.reduce((sum, item) => sum + item.sheets.reduce((sheetSum, sheet) => sheetSum + sheet.rowCount, 0), 0)
     session.progress = { ...session.progress!, status: terminal ? 'completed' : 'parsing', filesCompleted: session.files.filter((item) => item.status === 'inspected').length, filesFailed: session.files.filter((item) => item.status === 'error').length, totalRows: processed, rowsProcessed: processed, percent: terminal ? 100 : Math.round(session.files.filter((item) => item.status !== 'uploaded').length / session.files.length * 100), elapsedMs: Date.now() - session.createdAt }
     this.persistSnapshot(job.importId); await this.store?.flush()
+    if (terminal) this.scheduleCleanup(job.importId, IMPORT_CONFIG.fileRetentionMs)
     await saveCheckpoint({ phase: 'completed', fileId: file.id, rowsProcessed: rows })
   }
 
@@ -593,7 +623,14 @@ export class ImportsService implements OnModuleInit {
   }
 
   private scheduleCleanup(importId: string, delayMs = IMPORT_CONFIG.sessionTtlMs): void {
+    const previous = this.sessionTimers.get(importId)
+    if (previous) clearTimeout(previous)
     const timer = setTimeout(() => {
+      const status = this.sessions.get(importId)?.progress?.status
+      if (status && !['completed', 'cancelled', 'failed'].includes(status)) {
+        this.markFailed(importId, 'Import expired before processing completed.', 'IMPORT_EXPIRED')
+        return
+      }
       this.cleanupSession(importId)
     }, delayMs)
     timer.unref()
@@ -619,7 +656,7 @@ export class ImportsService implements OnModuleInit {
     if (!session) return
     for (const file of session.files) {
       if (file.filePath && fs.existsSync(file.filePath)) {
-        try { fs.unlinkSync(file.filePath) } catch { /* ignore */ }
+        try { fs.unlinkSync(file.filePath) } catch (error) { this.logger.warn(`Could not clean import file ${safeImportSourceName(file.filePath)}: ${(error as Error).message}`) }
       }
     }
   }

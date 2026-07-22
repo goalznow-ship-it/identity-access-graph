@@ -5,8 +5,10 @@ import * as path from 'node:path'
 import { ImportsService } from '../imports.service'
 import { parseCsvChunked } from '../parsers/chunked-parser'
 import { IMPORT_CONFIG } from '../import-config'
+import { ImportWorkerService } from '../import-worker.service'
+import { ImportSourceError, SOURCE_FILE_MISSING, SOURCE_FILE_UNAVAILABLE_MESSAGE } from '../import-source-file'
 
-const tmpDir = path.resolve(process.cwd(), '.imports-tmp-worker-flow')
+const tmpDir = path.join(IMPORT_CONFIG.uploadDir, '.worker-flow-test')
 
 before(() => {
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
@@ -21,6 +23,14 @@ after(() => {
 describe('createReadStream — default-import fix regression', () => {
   it('fs.createReadStream is a function (not undefined)', () => {
     assert.equal(typeof fs.createReadStream, 'function')
+  })
+
+  it('handles a UTF-8 BOM and quoted CSV fields', async () => {
+    const filePath = path.join(tmpDir, 'bom-quotes.csv')
+    fs.writeFileSync(filePath, '\uFEFF"id","name"\n"1","Doe, Jane"\n')
+    const result = await parseCsvChunked(filePath, 'test', { onChunk: async () => {}, onProgress: async () => {}, isCancelled: () => false })
+    assert.equal(result.rowCount, 1)
+    assert.equal(result.previewRows[0].name, 'Doe, Jane')
   })
 
   it('parseCsvChunked opens files with createReadStream successfully', async () => {
@@ -97,6 +107,56 @@ describe('ImportsService — session failure and lifecycle', () => {
       () => service.processQueuedJob(jobEntity, async () => {}),
       /Import session or file is no longer available/,
     )
+  })
+
+  it('missing source during queued processing rejects safely with a structured code', async () => {
+    const service = new ImportsService()
+    const importId = '00000000-0000-4000-8000-000000000001'
+    const fileId = '00000000-0000-4000-8000-000000000002'
+    ;(service as any).sessions.set(importId, {
+      importId, createdAt: Date.now(), files: [{ id: fileId, originalName: 'gone.csv', sanitizedName: 'gone.csv', mimeType: 'text/csv', size: 1, status: 'uploaded', sheets: [], filePath: path.join(tmpDir, 'gone.csv') }],
+      progress: { status: 'parsing', filesCompleted: 0, filesFailed: 0, totalRows: 0, rowsProcessed: 0, percent: 0, throughput: 0, elapsedMs: 0, estimatedRemainingMs: 0, warnings: [], truncated: false },
+    } as any)
+    const job = { id: 'job-missing', importId, fileId, status: 'QUEUED', checkpoint: {}, attempts: 1, maxAttempts: 3 } as any
+    await assert.rejects(() => service.processQueuedJob(job, async () => {}), (error: any) => error.code === SOURCE_FILE_MISSING && error.message === SOURCE_FILE_UNAVAILABLE_MESSAGE)
+  })
+
+  it('startup recovery is idempotent for a missing file and excludes the failed session from active imports', async () => {
+    const failed: string[] = []
+    const queue = {
+      jobsFor: async () => [{ id: 'job-recovery', importId: 'import-recovery', fileId: 'file-recovery', status: 'PROCESSING' }],
+      failPermanent: async () => { failed.push('failed') },
+      requeueRecovered: async () => { throw new Error('must not resume') },
+    }
+    const service = new ImportsService(undefined, queue as any)
+    ;(service as any).sessions.set('import-recovery', { importId: 'import-recovery', createdAt: Date.now(), files: [{ id: 'file-recovery', originalName: 'gone.csv', sanitizedName: 'gone.csv', status: 'uploaded', sheets: [], filePath: path.join(tmpDir, 'missing.csv') }], progress: { status: 'parsing', filesCompleted: 0, filesFailed: 0 } })
+    await (service as any).recoverStaleSessions()
+    await (service as any).recoverStaleSessions()
+    assert.equal(failed.length, 1)
+    assert.equal(service.getProgress('import-recovery')?.status, 'failed')
+    assert.notEqual(service.getLatestSession()?.importId, 'import-recovery')
+  })
+
+  it('startup recovery requeues an unfinished job when its source still exists', async () => {
+    const filePath = path.join(tmpDir, 'resume.csv')
+    fs.writeFileSync(filePath, 'id,name\n1,Alice\n')
+    let resumed = 0
+    const queue = { jobsFor: async () => [{ id: 'job-resume', importId: 'import-resume', fileId: 'file-resume', status: 'PROCESSING' }], failPermanent: async () => { throw new Error('must not fail') }, requeueRecovered: async () => { resumed++ } }
+    const service = new ImportsService(undefined, queue as any)
+    ;(service as any).sessions.set('import-resume', { importId: 'import-resume', createdAt: Date.now(), files: [{ id: 'file-resume', originalName: 'resume.csv', sanitizedName: 'resume.csv', status: 'uploaded', sheets: [], filePath }], progress: { status: 'parsing', filesCompleted: 0, filesFailed: 0 } })
+    await (service as any).recoverStaleSessions()
+    assert.equal(resumed, 1)
+    assert.equal(service.getProgress('import-resume')?.status, 'parsing')
+  })
+
+  it('worker contains parser failure and persists a permanent missing-source failure', async () => {
+    const calls: string[] = []
+    const queue = { complete: async () => calls.push('complete'), fail: async () => calls.push('retry'), failPermanent: async () => calls.push('permanent'), checkpoint: async () => {}, stats: async () => ({ counts: {} }) }
+    const imports = { processQueuedJob: async () => { throw new ImportSourceError(SOURCE_FILE_MISSING, SOURCE_FILE_UNAVAILABLE_MESSAGE) }, getSession: () => undefined, markFileFailed: () => calls.push('session-failed') }
+    const worker = new ImportWorkerService(queue as any, imports as any)
+    await (worker as any).runJob({ id: 'job', importId: 'import', fileId: 'file' })
+    assert.deepEqual(calls, ['permanent', 'session-failed'])
+    assert.equal((await worker.health()).status, 'starting')
   })
 
   it('cancel marks session as cancelled', () => {

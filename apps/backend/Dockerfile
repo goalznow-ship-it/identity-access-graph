@@ -40,7 +40,8 @@ COPY --from=build /app/apps/backend/package-lock.json ./package-lock.json
 COPY --from=build /app/apps/backend/node_modules ./node_modules
 COPY --from=build /app/apps/backend/dist ./dist
 
-RUN chown -R appuser:appgroup /app/apps/backend
+RUN mkdir -p /app/apps/backend/.imports-tmp/.state \
+    && chown -R appuser:appgroup /app/apps/backend
 
 USER appuser
 

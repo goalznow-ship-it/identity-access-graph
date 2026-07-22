@@ -125,6 +125,13 @@ export function ImportsPage() {
       setSessionError(null)
       getSession(restoreImportId)
         .then((sess) => {
+          if (sess.progress?.status === 'failed') {
+            const sourceMissing = sess.error?.code === 'SOURCE_FILE_MISSING' || sess.files.some((file) => file.errorCode === 'SOURCE_FILE_MISSING' || file.error === 'The uploaded source file is no longer available. Please upload the file again.')
+            setSessionError(sourceMissing ? 'The uploaded source file is no longer available. Please upload the file again.' : sess.error?.message ?? sess.files.find((file) => file.error)?.error ?? 'The previous import failed. Please start a new import.')
+            clearStoredImportId()
+            setEffectiveStep('upload')
+            return
+          }
           setSession(sess)
           if (sess.files.length > 0) {
             const first = sess.files[0]
@@ -376,7 +383,7 @@ export function ImportsPage() {
               {progress.warnings.map((w, i) => <div key={i}>{w}</div>)}
             </div>
           )}
-          {progress.status !== 'cancelled' && progress.status !== 'completed' && (
+          {progress.status !== 'cancelled' && progress.status !== 'completed' && progress.status !== 'failed' && (
             <button
               onClick={cancel}
               disabled={cancelling}

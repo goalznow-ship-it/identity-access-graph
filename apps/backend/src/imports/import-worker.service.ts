@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { IMPORT_CONFIG } from './import-config'
 import { ImportQueueService } from './import-queue.service'
 import { ImportsService } from './imports.service'
+import { ImportSourceError, safeImportSourceName, structuredImportError } from './import-source-file'
 
 @Injectable()
 export class ImportWorkerService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -15,7 +16,10 @@ export class ImportWorkerService implements OnApplicationBootstrap, OnModuleDest
   private lastError?: string
 
   constructor(private readonly queue: ImportQueueService, private readonly imports: ImportsService) {}
-  onApplicationBootstrap() { this.timer = setInterval(() => void this.tick(), IMPORT_CONFIG.workerPollMs); this.timer.unref(); void this.tick() }
+  onApplicationBootstrap() {
+    const safeTick = () => void this.tick().catch((error: Error) => { this.lastError = error.message; this.logger.error(`Worker tick failed safely: ${error.message}`) })
+    this.timer = setInterval(safeTick, IMPORT_CONFIG.workerPollMs); this.timer.unref(); safeTick()
+  }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer) }
 
   async tick() {
@@ -24,10 +28,27 @@ export class ImportWorkerService implements OnApplicationBootstrap, OnModuleDest
       const job = await this.queue.claim(this.workerId).catch((error) => { this.lastError = (error as Error).message; return null })
       if (!job) break
       this.active++
-      void this.imports.processQueuedJob(job, (checkpoint) => this.queue.checkpoint(job.id, checkpoint))
-        .then(() => this.queue.complete(job))
-        .catch(async (error: Error) => { this.lastError = error.message; this.logger.error(`Import job ${job.id} failed: ${error.message}`); await this.queue.fail(job, error); this.imports.markFileFailed(job.importId, job.fileId, error.message) })
-        .finally(() => { this.active--; void this.tick() })
+      void this.runJob(job).finally(() => { this.active--; void this.tick().catch((error: Error) => this.logger.error(`Worker continuation failed safely: ${error.message}`)) })
+    }
+  }
+
+  private async runJob(job: any): Promise<void> {
+    try {
+      await this.imports.processQueuedJob(job, (checkpoint) => this.queue.checkpoint(job.id, checkpoint))
+      await this.queue.complete(job)
+    } catch (error) {
+      const detail = structuredImportError(error)
+      this.lastError = detail.message
+      const session = this.imports.getSession(job.importId)
+      const file = session?.files.find((item) => item.id === job.fileId)
+      this.logger.error(`Import job failed import=${job.importId} job=${job.id} file=${safeImportSourceName(file?.filePath ?? file?.sanitizedName ?? job.fileId)} code=${detail.code}: ${detail.message}`)
+      try {
+        if (error instanceof ImportSourceError) await this.queue.failPermanent(job, error)
+        else await this.queue.fail(job, error instanceof Error ? error : new Error(detail.message))
+        this.imports.markFileFailed(job.importId, job.fileId, detail.message, detail.code)
+      } catch (persistError) {
+        this.logger.error(`Could not persist import failure import=${job.importId} job=${job.id}: ${(persistError as Error).message}`)
+      }
     }
   }
 

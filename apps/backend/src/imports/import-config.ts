@@ -25,6 +25,8 @@ export const IMPORT_CONFIG = {
   workerPollMs: Math.max(100, envInt('IMPORT_WORKER_POLL_MS', 1_000)),
   workerLeaseMs: Math.max(5_000, envInt('IMPORT_WORKER_LEASE_MS', 60_000)),
   maxJobAttempts: Math.max(1, envInt('IMPORT_MAX_JOB_ATTEMPTS', 3)),
+  staleJobTimeoutMs: Math.max(5_000, envInt('IMPORT_STALE_JOB_TIMEOUT_MINUTES', 30) * 60 * 1000),
+  fileRetentionMs: Math.max(0, envInt('IMPORT_FILE_RETENTION_HOURS', 24) * 60 * 60 * 1000),
   retryBaseDelayMs: Math.max(100, envInt('IMPORT_RETRY_BASE_DELAY_MS', 1_000)),
   maxWarningCount: envInt('IMPORT_MAX_WARNING_COUNT', 1_000),
   maxValidationIssues: envInt('IMPORT_MAX_VALIDATION_ISSUES', 10_000),

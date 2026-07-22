@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { parse } from 'csv-parse'
 import { IMPORT_CONFIG } from '../import-config'
 import type { ParsedSheetInfo, SheetWarning } from '../types'
+import { requireReadableImportSource } from '../import-source-file'
 
 export interface ChunkCallbacks {
   resumeRows?: number
@@ -13,7 +14,11 @@ export interface ChunkCallbacks {
 }
 
 export async function parseCsvChunked(filePath: string, sheetName: string, callbacks: ChunkCallbacks): Promise<ParsedSheetInfo> {
-  const parser = fs.createReadStream(filePath).pipe(parse({ columns: true, bom: true, relax_column_count: true, skip_empty_lines: true, trim: true }))
+  const safePath = await requireReadableImportSource(filePath)
+  const source = fs.createReadStream(safePath)
+  const parser = parse({ columns: true, bom: true, relax_column_count: true, skip_empty_lines: true, trim: true })
+  source.on('error', (error) => parser.destroy(error))
+  source.pipe(parser)
   const previewRows: Record<string, unknown>[] = [], warnings: SheetWarning[] = [], chunk: Record<string, unknown>[] = []
   let headers: string[] = [], rowCount = 0, chunkIndex = Math.floor((callbacks.resumeRows ?? 0) / IMPORT_CONFIG.chunkSizeRows)
   for await (const raw of parser) {
@@ -36,7 +41,8 @@ export async function parseCsvChunked(filePath: string, sheetName: string, callb
 }
 
 export async function parseExcelChunked(filePath: string, callbacks: ChunkCallbacks): Promise<ParsedSheetInfo[]> {
-  const workbook = XLSX.readFile(filePath, { cellFormula: false, cellHTML: false, cellNF: false, cellText: true, raw: true, type: 'file', dense: true })
+  const safePath = await requireReadableImportSource(filePath)
+  const workbook = XLSX.readFile(safePath, { cellFormula: false, cellHTML: false, cellNF: false, cellText: true, raw: true, type: 'file', dense: true })
   const results: ParsedSheetInfo[] = []
   for (let sheetIndex = 0; sheetIndex < Math.min(workbook.SheetNames.length, IMPORT_CONFIG.maxSheetsPerWorkbook); sheetIndex++) {
     const name = workbook.SheetNames[sheetIndex], worksheet = workbook.Sheets[name], range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1:A1')

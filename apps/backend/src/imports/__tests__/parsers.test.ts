@@ -5,8 +5,9 @@ import * as path from 'node:path'
 import { parseCsv } from '../parsers/csv-parser'
 import { parseExcel } from '../parsers/excel-parser'
 import { parseJson } from '../parsers/json-parser'
+import { IMPORT_CONFIG } from '../import-config'
 
-const tmpDir = path.resolve(process.cwd(), '.imports-tmp-test')
+const tmpDir = path.join(IMPORT_CONFIG.uploadDir, '.parser-test')
 
 function writeTestFile(name: string, content: string): string {
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })

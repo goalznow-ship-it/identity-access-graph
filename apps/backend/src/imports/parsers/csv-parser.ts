@@ -3,9 +3,11 @@ import * as readline from 'node:readline'
 import * as path from 'node:path'
 import { IMPORT_CONFIG } from '../import-config'
 import type { ParsedSheetInfo, SheetWarning } from '../types'
+import { requireReadableImportSource } from '../import-source-file'
 
 export async function parseCsv(filePath: string, sheetName: string): Promise<ParsedSheetInfo> {
-  const stat = fs.statSync(filePath)
+  const safePath = await requireReadableImportSource(filePath)
+  const stat = await fs.promises.stat(safePath)
   if (stat.size === 0) {
     return emptyResult(sheetName, 'CSV file is empty.')
   }
@@ -22,8 +24,9 @@ export async function parseCsv(filePath: string, sheetName: string): Promise<Par
     let dupCount = 0
     const colValues: Map<number, Set<string>> = new Map()
 
+    const source = fs.createReadStream(safePath, { encoding: 'utf-8' })
     const rl = readline.createInterface({
-      input: fs.createReadStream(filePath, { encoding: 'utf-8' }),
+      input: source,
       crlfDelay: Infinity,
     })
 
@@ -103,6 +106,7 @@ export async function parseCsv(filePath: string, sheetName: string): Promise<Par
       })
     })
 
+    source.on('error', (err) => reject(err))
     rl.on('error', (err) => reject(err))
   })
 }

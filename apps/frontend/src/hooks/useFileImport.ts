@@ -32,9 +32,13 @@ export function useFileImport() {
           const p = await getImportProgress(session.importId)
           setProgress(p)
           if (p.status === 'completed' || p.status === 'cancelled' || p.status === 'failed') {
-            if (p.status === 'completed') {
+            if (p.status === 'completed' || p.status === 'failed') {
               const completed = await getSession(session.importId)
               setSession(completed)
+              if (p.status === 'failed') {
+                const sourceMissing = completed.error?.code === 'SOURCE_FILE_MISSING' || completed.files.some((file) => file.errorCode === 'SOURCE_FILE_MISSING' || file.error === 'The uploaded source file is no longer available. Please upload the file again.')
+                setError(sourceMissing ? 'The uploaded source file is no longer available. Please upload the file again.' : completed.error?.message ?? completed.files.find((file) => file.error)?.error ?? 'Import processing failed.')
+              }
             }
             if (pollRef.current) clearInterval(pollRef.current)
           }

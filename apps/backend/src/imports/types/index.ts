@@ -23,6 +23,7 @@ export interface ImportFile {
   status: ImportStatus
   sheets: SheetInfo[]
   error?: string
+  errorCode?: string
   filePath?: string
   progress?: FileProgress
 }
@@ -73,6 +74,7 @@ export interface ImportSession {
   progress?: SessionProgress
   createdAt: number
   cancelled?: boolean
+  error?: { code: string; message: string }
 }
 
 export interface SessionProgress {

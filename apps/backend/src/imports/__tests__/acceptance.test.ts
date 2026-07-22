@@ -9,8 +9,9 @@ import { generateNormalizedPreview } from '../validation/normalized-preview'
 import { IdentityCorrelationService } from '../correlation/identity-correlation.service'
 import { GraphConversionService } from '../graph-conversion/graph-conversion.service'
 import { deterministicId } from '../graph-conversion/deterministic-id'
+import { IMPORT_CONFIG } from '../import-config'
 
-const tmpDir = path.resolve(process.cwd(), '.imports-tmp-acceptance')
+const tmpDir = path.join(IMPORT_CONFIG.uploadDir, '.acceptance-test')
 
 function csv(...rows: string[]): string { return rows.join('\n') }
 
@@ -24,7 +25,6 @@ const FIXTURES: Record<string, string> = {}
 
 before(() => {
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
-  process.env.IMPORT_UPLOAD_DIR = tmpDir
 
   FIXTURES['users.csv'] = writeCsv('users.csv', csv(
     'username,displayName,email,sourceSystem,riskLevel,status,groupName,manager',
@@ -78,7 +78,6 @@ before(() => {
 
 after(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true })
-  delete process.env.IMPORT_UPLOAD_DIR
 })
 
 describe('Full import pipeline — 7-type acceptance test', () => {
