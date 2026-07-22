@@ -453,7 +453,17 @@ export class ImportsController {
     if (requestedLimits && (!Number.isInteger(parsedNodeLimit) || parsedNodeLimit < 0 || !Number.isInteger(parsedRelationshipLimit) || parsedRelationshipLimit < 0)) {
       throw new HttpException('Preview limits must be non-negative integers.', HttpStatus.BAD_REQUEST)
     }
-    if (requestedLimits) return (await this.convert(importId, { nodeLimit: parsedNodeLimit, relationshipLimit: parsedRelationshipLimit })).preview
+    if (requestedLimits) {
+      const graph = await this.graphChunks.load(importId)
+      if (graph.nodes.length || graph.links.length) {
+        const visibleNodes = graph.nodes.slice(0, parsedNodeLimit)
+        const visibleIds = new Set(visibleNodes.map(node => node.id))
+        return { nodes: visibleNodes, links: graph.links.filter(link => visibleIds.has(String(link.source)) && visibleIds.has(String(link.target))).slice(0, parsedRelationshipLimit) }
+      }
+      const result = this.service.getConversionResult(importId)
+      if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
+      return { nodes: result.preview.nodes.slice(0, parsedNodeLimit), links: result.preview.links.slice(0, parsedRelationshipLimit) }
+    }
     const result = this.service.getConversionResult(importId)
     if (!result) throw new HttpException('Conversion has not been run.', HttpStatus.NOT_FOUND)
     return result.preview

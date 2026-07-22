@@ -11,6 +11,6 @@ if (import.meta.hot) import.meta.hot.dispose(cleanupFetch)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider><RouterProvider router={router} /></AuthProvider>
+    <AuthProvider><RouterProvider router={router} future={{ v7_startTransition: true }} /></AuthProvider>
   </StrictMode>,
 )

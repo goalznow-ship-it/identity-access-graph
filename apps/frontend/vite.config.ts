@@ -26,7 +26,7 @@ export default defineConfig({
       '/attack-path':  backend,
       '/connectors':   passThrough('/connectors'),
       '/identity':     backend,
-      '/pipeline':     backend,
+      '/pipeline':     passThrough('/pipeline'),
       '/notifications': backend,
       '/admin':         backend,
       '/health':       backend,

@@ -128,11 +128,13 @@ export async function graphBuildStage(input: StageInput): Promise<StageResult & 
   const rels = input.relationships
 
   for (const r of rels) {
-    if (!nodeIds.has((r as any).sourceNodeId)) {
-      errors.push(`Relationship ${(r as any).id}: source node '${(r as any).sourceNodeId}' not found`)
+    const source = (r as any).sourceNodeId ?? (typeof (r as any).source === 'object' ? (r as any).source?.id : (r as any).source)
+    const target = (r as any).targetNodeId ?? (typeof (r as any).target === 'object' ? (r as any).target?.id : (r as any).target)
+    if (!nodeIds.has(source)) {
+      errors.push(`Relationship ${(r as any).id}: source node '${source}' not found`)
     }
-    if (!nodeIds.has((r as any).targetNodeId)) {
-      errors.push(`Relationship ${(r as any).id}: target node '${(r as any).targetNodeId}' not found`)
+    if (!nodeIds.has(target)) {
+      errors.push(`Relationship ${(r as any).id}: target node '${target}' not found`)
     }
   }
 

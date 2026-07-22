@@ -19,7 +19,9 @@ async function bootstrap() {
 
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }))
 
-  app.useGlobalGuards(new RateLimiterGuard(100, 60000))
+  const rateLimit = Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? 1000)
+  const rateWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60000)
+  app.useGlobalGuards(new RateLimiterGuard(rateLimit, rateWindowMs))
 
   app.useGlobalPipes(
     new ValidationPipe({

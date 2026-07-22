@@ -35,5 +35,5 @@ export const pipelineApi = {
   getState: () => request<import('../types/pipeline').PipelineRun>('/pipeline/state'),
   getSnapshots: () =>
     request<import('../types/pipeline').StageSnapshot[]>('/pipeline/snapshots'),
-  getInputStatus: () => request<{ ready: boolean; source: 'neo4j' | 'unavailable'; productionSafe: boolean; message: string }>('/pipeline/input-status'),
+  getInputStatus: () => request<{ ready: boolean; source: 'neo4j' | 'imported' | 'unavailable'; productionSafe: boolean; message: string }>('/pipeline/input-status'),
 }

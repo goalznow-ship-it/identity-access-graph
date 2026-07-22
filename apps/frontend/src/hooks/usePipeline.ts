@@ -11,7 +11,7 @@ interface Toast {
 interface UsePipelineReturn {
   state: PipelineRun | null
   snapshots: StageSnapshot[]
-  inputStatus: { ready: boolean; source: 'neo4j' | 'unavailable'; productionSafe: boolean; message: string } | null
+  inputStatus: { ready: boolean; source: 'neo4j' | 'imported' | 'unavailable'; productionSafe: boolean; message: string } | null
   initialLoading: boolean
   loadError: string
   loading: Record<string, boolean>
