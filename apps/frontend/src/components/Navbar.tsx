@@ -14,8 +14,7 @@ import { NotificationCenter } from './NotificationCenter'
 
 export function Navbar() {
   const auth = useAuth(), { source } = useGraphSource(), navigate = useNavigate()
-  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
-  const { data } = useGraphData(source === 'imported' ? importId : null, source)
+  const { data } = useGraphData(null, source)
   const [query, setQuery] = useState(''), [active, setActive] = useState(0), [remote, setRemote] = useState<GraphNode[]>([])
   const debounced = useDebouncedValue(query)
   useEffect(() => {

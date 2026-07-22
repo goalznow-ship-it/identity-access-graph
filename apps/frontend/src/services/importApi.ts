@@ -20,6 +20,9 @@ export class ImportApiError extends Error {
   constructor(message: string, public readonly status: number) { super(message); this.name = 'ImportApiError' }
 }
 
+export const isNoActiveImportError = (error: unknown): error is ImportApiError =>
+  error instanceof ImportApiError && error.status === 404 && error.message === 'No import session is available.'
+
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, options)
   if (!res.ok) {
@@ -65,6 +68,11 @@ export function getErrorReportUrl(importId: string) { return `${API_BASE}/import
 
 export async function getActiveImportSession(): Promise<ImportSession> {
   return apiFetch<ImportSession>('/imports/active')
+}
+
+export async function getActiveImportSessionOrNull(): Promise<ImportSession | null> {
+  try { return await getActiveImportSession() }
+  catch (error) { if (isNoActiveImportError(error)) return null; throw error }
 }
 
 export async function getActiveImportGraphPreview(nodeLimit = 500, relationshipLimit = 2000): Promise<ImportGraphPreview> {

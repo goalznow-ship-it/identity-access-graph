@@ -36,7 +36,6 @@ import { getNode as getNeo4jNode, searchNodes as searchNeo4jNodes } from '../ser
 import { adaptNeo4jNode } from '../services/neo4jGraphAdapter'
 import { Neo4jStatusBadge } from '../components/Neo4jStatusBadge'
 import { loadSettings } from '../services/navigation'
-import { getActiveImportSession } from '../services/importApi'
 import { clusterGraph, filterGraphView, loadLayout, saveLayout, type GraphClusterMode, type GraphViewMode, type SavedGraphView } from '../services/graphPresentation'
 import { getAttackPath } from '../services/attackPathApi'
 import type { AttackPath } from '../types/attackPath'
@@ -45,11 +44,11 @@ export function GraphPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const importedId = searchParams.get('importId')
-  const [importedAvailable,setImportedAvailable]=useState(Boolean(importedId))
   const { source, setSource } = useGraphSource(importedId ? 'imported' : searchParams.get('source'))
   const backendFilters = { nodeType: searchParams.get('nodeType') ?? undefined, sourceSystem: searchParams.get('sourceSystem') ?? undefined, risk: searchParams.get('risk') ?? undefined, status: searchParams.get('status') ?? undefined }
   const [remoteFilters, setRemoteFilters] = useState<Record<string, unknown>>(backendFilters)
   const { data, loading, error, retry, partial, expanding, expandRemote, fallbackNotice: importFallbackNotice } = useGraphData(source === 'imported' ? importedId : null, source, remoteFilters)
+  const importedAvailable = Boolean(importedId || data?.nodes.length)
   const links = data?.links ?? []
   const hasRelationships = links.length > 0
   const {
@@ -198,7 +197,6 @@ export function GraphPage() {
     return () => window.removeEventListener('keydown', handler)
   }, [clearSelection, investigation.back, investigation.forward])
 
-  useEffect(()=>{let cancelled=false;if(importedId){setImportedAvailable(true);return()=>{cancelled=true}}void getActiveImportSession().then((session)=>{if(cancelled)return;setImportedAvailable(true);localStorage.setItem('lastImportId',session.importId)}).catch(()=>{if(!cancelled)setImportedAvailable(false)});return()=>{cancelled=true}},[importedId,source])
   useEffect(() => { if (source !== 'neo4j' || !error || typeof localStorage === 'undefined') return; if (loadSettings(localStorage).autoFallback && importedAvailable) { setFallbackNotice(`Neo4j Live unavailable: ${error}. Switched to imported session.`); setSource('imported') } }, [source, error, setSource, importedAvailable])
   useEffect(()=>{if(typeof localStorage==='undefined')return;const next=loadLayout(localStorage,source);setLayout(next);window.setTimeout(()=>fgRef.current?.setLayout(next),0)},[source])
 
@@ -226,7 +224,7 @@ export function GraphPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="p-6 text-center">
-          <p className="text-gray-400">{source==='neo4j'?'Neo4j Live returned no graph objects.':source==='imported'?'The imported session has no graph data.':'No graph data matches the current workspace.'}</p><div className="mt-3 flex justify-center gap-2"><button onClick={clearGraphFilters} className="rounded bg-primary px-3 py-1.5 text-xs">Clear filters</button>{source==='neo4j'&&<button onClick={()=>void retry()} className="rounded border border-border px-3 py-1.5 text-xs">Retry</button>}{source==='imported'&&<button onClick={() => navigate('/imports')} className="rounded border border-border px-3 py-1.5 text-xs">Open Imports</button>}</div>
+          <p className="text-gray-400">{data?.nodes.length===0?'No dataset has been imported yet.':'No graph data matches the current workspace.'}</p><div className="mt-3 flex justify-center gap-2"><button onClick={clearGraphFilters} className="rounded bg-primary px-3 py-1.5 text-xs">Clear filters</button>{source==='neo4j'&&<button onClick={()=>void retry()} className="rounded border border-border px-3 py-1.5 text-xs">Retry</button>}{source==='imported'&&<button onClick={() => navigate('/imports')} className="rounded border border-border px-3 py-1.5 text-xs">Open Imports</button>}</div>
         </Card>
       </div>
     )

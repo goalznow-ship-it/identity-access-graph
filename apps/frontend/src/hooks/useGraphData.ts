@@ -1,7 +1,7 @@
 import { useCallback,useEffect,useState } from 'react'
 import type { GraphData } from '../types/graph'
 import type { GraphSourceMode } from '../types/neo4j'
-import { getActiveImportGraphPreview, getImportGraphPreview, ImportApiError } from '../services/importApi'
+import { loadImportedGraph } from '../services/graphDataSource'
 import { useNeo4jGraph } from './useNeo4jGraph'
 
 export function useGraphData(importId?:string|null,source:GraphSourceMode=importId?'imported':'neo4j',filters:Record<string,unknown>={}){
@@ -18,27 +18,17 @@ export function useGraphData(importId?:string|null,source:GraphSourceMode=import
     setLoading(true);setError(null);setFallbackNotice(null)
     const load=async()=>{
       try{
-        let result
-        if(importId){
-          try{result=await getImportGraphPreview(importId,500,2000)}
-          catch(error){
-            if(error instanceof ImportApiError&&error.status===404){
-              result=await getActiveImportGraphPreview(500,2000)
-              setFallbackNotice('The requested import session expired. Loaded the latest active import instead.')
-            }else throw error
-          }
-        }else result=await getActiveImportGraphPreview(500,2000)
-        if(!cancelled)setData({nodes:result.nodes,links:result.links})
+        const result=await loadImportedGraph(importId,filters)
+        if(!cancelled){setData(result.data);setFallbackNotice(result.fallbackNotice)}
       }catch(error){
         if(cancelled)return
         setData(null)
-        if(error instanceof ImportApiError&&error.status===404)setError('No active imported dataset is available.')
-        else setError((error as Error).message)
+        setError((error as Error).message)
       }finally{if(!cancelled)setLoading(false)}
     }
     void load()
     return()=>{cancelled=true}
-  },[importId,source,revision])
+  },[importId,source,revision,JSON.stringify(filters)])
 
   const retry=useCallback(()=>{if(source==='neo4j')void neo4j.retry();else setRevision((value)=>value+1)},[source,neo4j.retry])
   if(source==='neo4j')return{data:neo4j.data,loading:neo4j.loading,error:neo4j.error,retry,partial:neo4j.partial,expanding:neo4j.expanding,expandRemote:neo4j.expand,fallbackNotice:null}

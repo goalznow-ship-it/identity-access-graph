@@ -36,8 +36,7 @@ function TabButton({ active, icon: Icon, label, onClick }: { active: boolean; ic
 
 export function LinuxAdminPage() {
   const { source } = useGraphSource()
-  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
-  const graph = useGraphData(source === 'imported' ? importId : null, source)
+  const graph = useGraphData(null, source)
   const [graphRevision, setGraphRevision] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const initialHostId = searchParams.get('hostId')

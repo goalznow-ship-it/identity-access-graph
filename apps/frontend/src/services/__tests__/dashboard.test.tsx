@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { DashboardGrid } from '../../components/dashboard/DashboardGrid'
+import { DashboardEmpty } from '../../components/dashboard/DashboardEmpty'
 import type { GraphData } from '../../types/graph'
 
 const data: GraphData = {
@@ -24,5 +25,10 @@ describe('live dashboard widgets', () => {
     assert.match(html, /Loading latest changes/)
     assert.doesNotMatch(html, /quarterly_access_review/)
     assert.doesNotMatch(html, /Maya Chen/)
+  })
+  it('renders an honest non-fatal empty dataset state', () => {
+    const html = renderToStaticMarkup(<DashboardEmpty empty onRetry={() => undefined} />)
+    assert.match(html, /No dataset has been imported yet\./)
+    assert.doesNotMatch(html, /Dashboard data unavailable/)
   })
 })

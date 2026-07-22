@@ -21,8 +21,7 @@ export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const navigate = useNavigate()
   const { source } = useGraphSource()
-  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
-  const graph = useGraphData(source === 'imported' ? importId : null, source)
+  const graph = useGraphData(null, source)
   const { profile, loading, error } = useUserProfile(userId, graph.data, graph.loading, graph.error)
 
   if (loading) {

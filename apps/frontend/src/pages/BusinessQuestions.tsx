@@ -42,8 +42,7 @@ function CategoryBadge({ category }: { category: QuestionCategory }) {
 
 export function BusinessQuestionsPage() {
   const { source } = useGraphSource()
-  const importId = typeof localStorage === 'undefined' ? null : localStorage.getItem('lastImportId')
-  const graph = useGraphData(source === 'imported' ? importId : null, source)
+  const graph = useGraphData(null, source)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<QuestionCategory | 'All'>('All')
   const [selectedQuestion, setSelectedQuestion] = useState<BusinessQuestion | null>(null)
