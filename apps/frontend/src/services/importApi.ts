@@ -50,11 +50,24 @@ export async function uploadFiles(files: File[]): Promise<ImportSession> {
   })
 
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || 'Upload failed')
+    throw new Error(await uploadErrorMessage(res))
   }
 
   return res.json()
+}
+
+export async function uploadErrorMessage(response: Response): Promise<string> {
+  if (response.status === 413) return 'Upload failed: file exceeds the configured server limit.'
+  const text = await response.text().catch(() => '')
+  if (text && response.headers.get('content-type')?.includes('application/json')) {
+    try {
+      const body = JSON.parse(text)
+      const message = Array.isArray(body?.message) ? body.message.join(', ') : body?.message
+      if (typeof message === 'string' && message.trim()) return `Upload failed: ${message.trim()}`
+    } catch { /* fall through to the safe generic message */ }
+  }
+  if (text && !/<(?:!doctype|html|head|body)\b/i.test(text)) return `Upload failed: ${text.slice(0, 500)}`
+  return `Upload failed: server returned ${response.status}.`
 }
 
 export async function getImportHistory(limit = 50, offset = 0) {

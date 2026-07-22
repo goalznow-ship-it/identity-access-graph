@@ -19,6 +19,8 @@ import { ImportReportingService } from './import-reporting.service'
 import { GraphContextService } from '../graph'
 import type { Response } from 'express'
 
+export const IMPORT_UPLOAD_OPTIONS = { limits: { fileSize: IMPORT_CONFIG.maxFileSizeBytes } }
+
 @ApiTags('Imports')
 @Controller('imports')
 export class ImportsController {
@@ -49,7 +51,7 @@ export class ImportsController {
   @ApiOperation({ summary: 'Upload Excel/CSV/JSON files for import' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Files uploaded and inspected' })
-  @UseInterceptors(FilesInterceptor('files', 50))
+  @UseInterceptors(FilesInterceptor('files', 50, IMPORT_UPLOAD_OPTIONS))
   async upload(@UploadedFiles() files: Express.Multer.File[]) {
     if (!files || files.length === 0) {
       throw new HttpException('No files provided.', HttpStatus.BAD_REQUEST)
@@ -65,7 +67,7 @@ export class ImportsController {
   @HttpCode(202)
   @ApiOperation({ summary: 'Upload files and enqueue durable background processing' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('files', 50))
+  @UseInterceptors(FilesInterceptor('files', 50, IMPORT_UPLOAD_OPTIONS))
   async uploadAsync(@UploadedFiles() files: Express.Multer.File[]) {
     if (!files?.length) throw new HttpException('No files provided.', HttpStatus.BAD_REQUEST)
     return this.service.uploadAsync(files)

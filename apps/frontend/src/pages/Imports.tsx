@@ -174,13 +174,18 @@ export function ImportsPage() {
         }
       } catch {}
 
-      try { await correlation.restore(session.importId) } catch {}
-      try { await conversion.restore(session.importId) } catch {}
+      const stepIndex = ['upload', 'inspect', 'map', 'validate', 'correlate', 'graphPreview', 'persist', 'complete'].indexOf(effectiveStep)
+      if (stepIndex >= 5) {
+        try { await correlation.restore(session.importId) } catch {}
+      }
+      if (stepIndex >= 6) {
+        try { await conversion.restore(session.importId) } catch {}
+      }
     }
 
     void restoreWorkflowArtifacts()
     return () => { cancelled = true }
-  }, [session?.importId, loadingSession, selectedFile?.id, sheetIndex])
+  }, [session?.importId, loadingSession, selectedFile?.id, sheetIndex, effectiveStep])
 
   useEffect(() => {
     if (session?.files.some((file) => file.sheets.length > 0) && effectiveStep === 'upload' && !loadingSession) {

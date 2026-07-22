@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ImportLimitsPanel } from '../../components/imports/ImportLimitsPanel'
 import type { ImportLimits } from '../../types/import'
+import { uploadErrorMessage } from '../importApi'
 
 describe('ImportLimitsPanel', () => {
   const limits: ImportLimits = {
@@ -34,5 +35,11 @@ describe('ImportLimitsPanel', () => {
     assert.match(html, /Max rows per sheet/)
     assert.match(html, /Preview rows/)
     assert.match(html, /Session timeout/)
+  })
+
+  it('turns proxy and backend upload failures into safe messages', async () => {
+    assert.equal(await uploadErrorMessage(new Response('<html>nginx</html>', { status: 413, headers: { 'content-type': 'text/html' } })), 'Upload failed: file exceeds the configured server limit.')
+    assert.equal(await uploadErrorMessage(new Response(JSON.stringify({ message: 'Unsupported file type.' }), { status: 400, headers: { 'content-type': 'application/json' } })), 'Upload failed: Unsupported file type.')
+    assert.equal(await uploadErrorMessage(new Response('<html>gateway failed</html>', { status: 502, headers: { 'content-type': 'text/html' } })), 'Upload failed: server returned 502.')
   })
 })

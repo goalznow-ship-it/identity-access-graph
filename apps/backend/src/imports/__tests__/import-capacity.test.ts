@@ -4,6 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { IMPORT_CONFIG } from '../import-config'
 import { ImportsService } from '../imports.service'
+import { IMPORT_UPLOAD_OPTIONS } from '../imports.controller'
 
 const tmpDir = path.resolve(process.cwd(), '.imports-tmp-capacity-test')
 
@@ -20,6 +21,7 @@ after(() => {
 describe('Import Config', () => {
   it('should parse 250 MB from env', () => {
     assert.equal(IMPORT_CONFIG.maxFileSizeBytes, 250 * 1024 * 1024)
+    assert.equal(IMPORT_UPLOAD_OPTIONS.limits.fileSize, IMPORT_CONFIG.maxFileSizeBytes)
   })
 
   it('should allow JSON extensions', () => {
