@@ -30,8 +30,8 @@ export async function extractionStage(input: StageInput): Promise<StageResult & 
   const nodes = [...input.nodes]
   const relationships = [...input.relationships]
 
-  warnings.push(`Extracted ${nodes.length} nodes from ${input.metadata.source ?? 'unknown'} source`)
-  if (nodes.length === 0) errors.push('No nodes extracted')
+  if (nodes.length === 0) warnings.push('No nodes extracted — empty graph')
+  else warnings.push(`Extracted ${nodes.length} nodes from ${input.metadata.source ?? 'unknown'} source`)
 
   return {
     stage: PipelineStage.Extraction,

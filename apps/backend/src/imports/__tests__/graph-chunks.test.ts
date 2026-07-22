@@ -36,7 +36,7 @@ describe('durable import graph chunks', () => {
       for await (const chunk of relationshipChunks) relationships += chunk.length
       return { counts: { nodesAdded: nodes, nodesUpdated: 0, relationshipsAdded: relationships, relationshipsUpdated: 0 } }
     } }
-    const service = new ImportGraphPersistenceService({ getConversionResult: () => conversion } as any, { isPersistenceEnabled: () => true } as any, undefined, enterprise as any, graphChunks as any)
+    const service = new ImportGraphPersistenceService({ getConversionResult: () => conversion } as any, { isPersistenceEnabled: () => true } as any, undefined, undefined, enterprise as any, graphChunks as any)
     const result = await service.persistConvertedGraph('import-1')
     assert.equal(nodes, 2)
     assert.equal(relationships, 1)

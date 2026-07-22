@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common'
-import { EnterpriseGraphService, GraphService } from '../graph'
+import { EnterpriseGraphService, GraphContextService, GraphService } from '../graph'
 import type { PersistedGraphNode, PersistedGraphRelationship } from '../graph'
 import { ImportsService } from './imports.service'
 import { RiskGraphSourceService } from '../risk'
@@ -26,6 +26,7 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     private readonly imports: ImportsService,
     private readonly graph: GraphService,
     @Optional() private readonly riskSource?: RiskGraphSourceService,
+    @Optional() private readonly graphContext?: GraphContextService,
     @Optional() private readonly enterpriseGraph?: EnterpriseGraphService,
     @Optional() private readonly graphChunks?: ImportGraphChunkService,
   ) {}
@@ -41,6 +42,7 @@ export class ImportGraphPersistenceService implements ImportGraphPersistence {
     if (!persistenceEnabled) {
       const completeGraph = conversion.fullGraph ?? await this.graphChunks?.load(importId) ?? conversion.preview
       await this.riskSource?.setMemoryGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links })
+      await this.graphContext?.setImportedGraph({ nodes: completeGraph.nodes, relationships: completeGraph.links }, importId)
       return {
         nodesUpserted: conversion.nodesCreated,
         relationshipsUpserted: conversion.relationshipsCreated,

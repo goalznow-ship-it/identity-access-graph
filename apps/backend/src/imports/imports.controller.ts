@@ -16,6 +16,7 @@ import { deterministicId } from './graph-conversion/deterministic-id'
 import { ImportGraphPersistenceService } from './import-graph-persistence.service'
 import { ImportGraphChunkService } from './import-graph-chunk.service'
 import { ImportReportingService } from './import-reporting.service'
+import { GraphContextService } from '../graph'
 import type { Response } from 'express'
 
 @ApiTags('Imports')
@@ -30,6 +31,7 @@ export class ImportsController {
     private readonly persistenceService: ImportGraphPersistenceService,
     private readonly graphChunks: ImportGraphChunkService,
     private readonly reporting: ImportReportingService,
+    private readonly graphContext: GraphContextService,
   ) {}
 
   @Get('limits')
@@ -79,10 +81,30 @@ export class ImportsController {
 
   @Get('active/graph-preview')
   @ApiOperation({ summary: 'Get graph preview for the most recent import session' })
-  getActiveGraphPreview(@Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
+  async getActiveGraphPreview(@Query('nodeLimit') nodeLimit?: string, @Query('relationshipLimit') relationshipLimit?: string) {
     const session = this.service.getLatestSession()
-    if (!session) throw new HttpException('No import session is available.', HttpStatus.NOT_FOUND)
-    return this.getGraphPreview(session.importId, nodeLimit, relationshipLimit)
+    if (session) return this.getGraphPreview(session.importId, nodeLimit, relationshipLimit)
+    const ctx = this.graphContext.getContext()
+    if (!ctx.available) throw new HttpException('No import session is available.', HttpStatus.NOT_FOUND)
+    const snapshot = await this.graphContext.getSnapshot()
+    const nodeLimitNum = Number(nodeLimit ?? IMPORT_CONFIG.maxGraphPreviewNodes)
+    const relationshipLimitNum = Number(relationshipLimit ?? IMPORT_CONFIG.maxGraphPreviewRelationships)
+    const nodes = snapshot.nodes.slice(0, nodeLimitNum)
+    const nodeIds = new Set(nodes.map((n) => n.id))
+    const links = snapshot.relationships.filter((r) => {
+      const src = typeof r.source === 'object' ? (r.source as any).id : r.source
+      const tgt = typeof r.target === 'object' ? (r.target as any).id : r.target
+      return nodeIds.has(src) && nodeIds.has(tgt)
+    }).slice(0, relationshipLimitNum)
+    return {
+      nodes,
+      links,
+      correlationGroups: [],
+      unresolvedReferences: [],
+      conflicts: [],
+      warnings: ['No active import session. Showing the last persisted imported graph.'],
+      pagination: { nodeLimit: nodeLimitNum, relationshipLimit: relationshipLimitNum, totalNodes: ctx.nodeCount, totalRelationships: ctx.relationshipCount, truncated: nodes.length < ctx.nodeCount || links.length < ctx.relationshipCount },
+    }
   }
 
   @Get(':importId')
