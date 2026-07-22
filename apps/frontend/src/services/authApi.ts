@@ -7,7 +7,7 @@ export const hasMinimumRole = (actual: PlatformRole | undefined, required: Platf
   Boolean(actual && ROLE_RANK[actual] >= ROLE_RANK[required])
 
 const TOKEN_KEY = 'iag-access-token'
-const BASE = ((import.meta as any).env?.VITE_API_URL || '').replace(/\/$/, '')
+const BASE = ((import.meta as any).env?.VITE_API_URL || '/api').replace(/\/$/, '')
 export const getAccessToken = () => typeof sessionStorage === 'undefined' ? '' : sessionStorage.getItem(TOKEN_KEY) ?? ''
 export const clearAccessToken = () => { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(TOKEN_KEY) }
 export const storeAccessToken = (token: string) => { if (typeof sessionStorage !== 'undefined' && token) sessionStorage.setItem(TOKEN_KEY, token) }

@@ -1,6 +1,6 @@
 import type { Connector, SyncRun } from '../types/connector'
 
-const BASE = ((import.meta as any).env?.VITE_API_URL || '').replace(/\/$/, '')
+const BASE = ((import.meta as any).env?.VITE_API_URL || '/api').replace(/\/$/, '')
 
 async function request<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${BASE}${path}`, {

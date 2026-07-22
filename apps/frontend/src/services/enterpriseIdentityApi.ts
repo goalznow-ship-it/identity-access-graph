@@ -8,7 +8,7 @@ import type {
   MergePreview,
 } from '../types/enterprise-identity'
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, {

@@ -1,5 +1,5 @@
 import type { GraphLink, GraphNode } from '../types/graph'
-const BASE=((import.meta as any).env?.VITE_API_URL||'').replace(/\/$/,'')
+const BASE=((import.meta as any).env?.VITE_API_URL||'/api').replace(/\/$/,'')
 export interface ExplorerQuery { q?:string;nodeTypes?:string[];sourceSystems?:string[];riskLevels?:string[];statuses?:string[];types?:string[];limit?:number;offset?:number;sortBy?:string;sortDirection?:'ASC'|'DESC';format?:'json'|'csv' }
 export interface ExplorerPage { items:GraphNode[];total:number;limit:number;offset:number;hasMore:boolean;sortBy:string;sortDirection:string }
 export interface RelationshipItem { relationship:GraphLink&{properties?:Record<string,unknown>};sourceName:string;targetName:string }

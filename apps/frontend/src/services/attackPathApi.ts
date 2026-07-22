@@ -1,5 +1,5 @@
 import type { AttackPath, AttackPathRun, AttackSearch, AttackSummary, BlastRadius, ChokePoint } from '../types/attackPath'
-const BASE=((import.meta as any).env?.VITE_API_URL||'').replace(/\/$/,'')
+const BASE=((import.meta as any).env?.VITE_API_URL||'/api').replace(/\/$/,'')
 async function req<T>(path:string,init?:RequestInit){const response=await fetch(`${BASE}${path}`,{...init,headers:{'Content-Type':'application/json',...init?.headers}});if(!response.ok)throw new Error(response.status===404?'Attack path not found':response.status===408?'Attack path analysis timed out':`Attack path request failed (${response.status})`);return response.json()as Promise<T>}
 export const searchAttackPaths=(body:AttackSearch,signal?:AbortSignal)=>req<{runId:string;paths:AttackPath[];count:number;durationMs:number;truncated:boolean}>('/attack-path/search',{method:'POST',body:JSON.stringify(body),signal})
 export const getAttackPath=(id:string)=>req<AttackPath>(`/attack-path/${encodeURIComponent(id)}`)
