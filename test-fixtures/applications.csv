@@ -1,0 +1,3 @@
+applicationName,displayName,sourceSystem,riskLevel,uses,owner
+Critical App,Critical Application,ACTIVE_DIRECTORY,CRITICAL,Database Core,alice
+Monitoring App,Monitoring Application,ACTIVE_DIRECTORY,NONE,Database Logs,carol

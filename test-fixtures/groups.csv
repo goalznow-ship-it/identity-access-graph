@@ -1,0 +1,5 @@
+groupName,displayName,description,sourceSystem,role
+Administrators,Administrators,Administrator group,ACTIVE_DIRECTORY,Admin Role
+Developers,Developers,Developer group,ACTIVE_DIRECTORY,Developer Role
+Security Team,Security Team,Security operations group,ACTIVE_DIRECTORY,Security Role
+DB Admins,DB Admins,Database administrator group,ACTIVE_DIRECTORY,DB Admin Role

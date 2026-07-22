@@ -1,0 +1,5 @@
+permissionName,displayName,sourceSystem
+admin_access,Admin Access,ACTIVE_DIRECTORY
+write_access,Write Access,ACTIVE_DIRECTORY
+read_access,Read Access,ACTIVE_DIRECTORY
+database_connect,Database Connect,ACTIVE_DIRECTORY

@@ -1,0 +1,4 @@
+hostname,displayName,os,sourceSystem,riskLevel
+db-server-01,Database Server 01,Windows Server 2022,ACTIVE_DIRECTORY,NONE
+db-server-02,Database Server 02,Windows Server 2022,ACTIVE_DIRECTORY,NONE
+web-server-01,Web Server 01,Ubuntu 22.04,LINUX,NONE

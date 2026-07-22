@@ -1,0 +1,9 @@
+username,displayName,email,sourceSystem,riskLevel,status,groupName,manager
+alice,anderson,alice@example.com,ACTIVE_DIRECTORY,NONE,ACTIVE,Administrators,bob
+bob,brown,bob@example.com,ACTIVE_DIRECTORY,NONE,ACTIVE,Administrators;DB Admins,carol
+carol,chen,carol@example.com,ACTIVE_DIRECTORY,NONE,ACTIVE,Security Team,
+david,davis,david@example.com,ACTIVE_DIRECTORY,HIGH,ACTIVE,Administrators;DB Admins,alice
+eve,evans,eve@example.com,ACTIVE_DIRECTORY,NONE,DISABLED,Developers,
+frank,foster,frank@example.com,ACTIVE_DIRECTORY,NONE,ACTIVE,Developers,
+grace,garcia,grace@example.com,ACTIVE_DIRECTORY,MEDIUM,ACTIVE,Developers,
+heidi,harris,heidi@example.com,ACTIVE_DIRECTORY,NONE,ACTIVE,Security Team,

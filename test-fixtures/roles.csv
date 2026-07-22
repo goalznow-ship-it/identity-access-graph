@@ -1,0 +1,5 @@
+roleName,displayName,description,sourceSystem,permission
+Admin Role,Admin Role,Full administrative role,ACTIVE_DIRECTORY,Admin Access
+Developer Role,Developer Role,Standard developer role,ACTIVE_DIRECTORY,Write Access
+Security Role,Security Role,Security operations role,ACTIVE_DIRECTORY,Read Access
+DB Admin Role,DB Admin Role,Database administration role,ACTIVE_DIRECTORY,Database Connect

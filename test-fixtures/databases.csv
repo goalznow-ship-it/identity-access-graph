@@ -1,0 +1,3 @@
+databaseName,displayName,sourceSystem,riskLevel,hostname
+Database Core,Production Core Database,ACTIVE_DIRECTORY,CRITICAL,db-server-01
+Database Logs,Logging Database,ACTIVE_DIRECTORY,LOW,db-server-02
